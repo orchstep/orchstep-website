@@ -1,0 +1,7 @@
+/* OrchStep custom styles */
+:root {
+  --sl-color-accent-low: #1a1a2e;
+  --sl-color-accent: #0f3460;
+  --sl-color-accent-high: #e94560;
+  --sl-font: 'Inter', system-ui, sans-serif;
+}
