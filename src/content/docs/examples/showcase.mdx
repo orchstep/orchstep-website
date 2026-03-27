@@ -5,19 +5,22 @@ description: Interactive examples with real execution output
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-Six curated examples that demonstrate OrchStep's core capabilities. Each tab shows the YAML source, the actual execution output, and the verification status from the test suite.
+Six curated examples that demonstrate OrchStep's core capabilities. Each example shows the YAML source, the actual execution output (captured from `orchstep run`), the spec test assertions, and the verification results.
 
 ---
 
 ## Hello World
 
-The simplest OrchStep workflow — one task, one step.
+The simplest OrchStep workflow -- one task, one step.
 
 <Tabs>
-  <TabItem label="orchstep.yml">
+  <TabItem label="Code">
     ```yaml
     # Example: Hello World
     # The simplest OrchStep workflow -- one task, one step.
+    # This is the starting point for learning OrchStep.
+    #
+    # Try: orchstep run
 
     name: hello-world
     desc: "Your first OrchStep workflow"
@@ -34,26 +37,52 @@ The simplest OrchStep workflow — one task, one step.
   </TabItem>
   <TabItem label="Output">
     ```
-    WORKFLOW: hello-world
-    Your first OrchStep workflow
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: hello-world
+│ 📋 Your first OrchStep workflow
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
-    TASK: main — Say hello
+┌─ 🎯 TASK: main
+│  💡 Say hello
+│
+└─ ⚡ STEP: greet
+   📝 Output a greeting using the shell function
+   ┌─ 💻 COMMAND: echo 'Hello from OrchStep!'
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Hello from OrchStep!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
 
-    STEP: greet
-      Output a greeting using the shell function
-      COMMAND: echo 'Hello from OrchStep!'
-      OUTPUT:
-        Hello from OrchStep!
-      STEP COMPLETED
-
-    TASK 'main' COMPLETED
-    WORKFLOW COMPLETED SUCCESSFULLY
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+    type: workflow
+    tests:
+      - name: test_hello_world
+        task: main
+        expect:
+          success: true
+          output_contains:
+            - "Hello from OrchStep!"
     ```
   </TabItem>
   <TabItem label="Verified">
-    **Lint:** PASS
-    **Run:** PASS (exit 0)
-    **Verified:** 2026-03-27
+    ```
+    VERIFICATION RESULTS:
+      Test: test_hello_world
+      Task: main
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "Hello from OrchStep!"
+      Result: PASS
+    ```
   </TabItem>
 </Tabs>
 
@@ -64,8 +93,16 @@ The simplest OrchStep workflow — one task, one step.
 OrchStep resolves variables with 4-level precedence: Runtime > Step > Task > Definition.
 
 <Tabs>
-  <TabItem label="orchstep.yml">
+  <TabItem label="Code">
     ```yaml
+    # Example: Variable Precedence
+    # Full demonstration of how OrchStep resolves variables when the same
+    # name is defined at multiple levels. Higher levels always win:
+    #
+    #   Runtime (--var) > Step vars > Task vars > Definition vars
+    #
+    # Try: orchstep run
+
     name: variable-precedence-demo
     desc: "Shows how variables at different levels override each other"
 
@@ -128,6 +165,22 @@ OrchStep resolves variables with 4-level precedence: Runtime > Step > Task > Def
               echo "environment = {{ vars.environment }}"
               echo "replicas    = {{ vars.replicas }}"
 
+      show_template_vars:
+        desc: "Variables can use template expressions"
+        vars:
+          base_url: "https://api.example.com"
+          api_version: "v2"
+        steps:
+          - name: computed_variable
+            desc: "Build a URL from other variables"
+            vars:
+              full_url: "{{ vars.base_url }}/{{ vars.api_version }}/users"
+            func: shell
+            do: |
+              echo "Base URL:    {{ vars.base_url }}"
+              echo "API Version: {{ vars.api_version }}"
+              echo "Full URL:    {{ vars.full_url }}"
+
       main:
         desc: "Run all precedence demonstrations"
         steps:
@@ -137,6 +190,8 @@ OrchStep resolves variables with 4-level precedence: Runtime > Step > Task > Def
             task: show_task_override
           - name: demo_step
             task: show_step_override
+          - name: demo_template
+            task: show_template_vars
           - name: summary
             func: shell
             do: |
@@ -149,44 +204,184 @@ OrchStep resolves variables with 4-level precedence: Runtime > Step > Task > Def
   </TabItem>
   <TabItem label="Output">
     ```
-    WORKFLOW: variable-precedence-demo
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: variable-precedence-demo
+│ 📋 Shows how variables at different levels override each other
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
-    TASK: show_definition_vars
-      environment = global-default
-      region      = us-east-1
-      replicas    = 1
+┌─ 🎯 TASK: main
+│  💡 Run all precedence demonstrations
+│
+├─ ⚡ STEP: demo_definition
+│  ┌─ 🔄 INVOKING SUBTASK: show_definition_vars
 
-    TASK: show_task_override
-      environment = task-staging
-      replicas    = 3
-      region      = us-east-1
-      task_only   = only-visible-in-this-task
+┌─ 🎯 TASK: show_definition_vars
+│  💡 Display definition-level defaults
+│
+└─ ⚡ STEP: show_globals
+   ┌─ 💻 COMMAND: echo "environment = global-default"
+echo "region      = us-east-1"
+echo "replicas    = 1"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ environment = global-default
+        │ region      = us-east-1
+        │ replicas    = 1
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_definition_vars' COMPLETED
+│  └─ ✅ SUBTASK 'show_definition_vars' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_task
+│  ┌─ 🔄 INVOKING SUBTASK: show_task_override
 
-    TASK: show_step_override
-      STEP: step_with_overrides
-        === Inside step with overrides ===
-        environment = step-production
-        replicas    = 10
+┌─ 🎯 TASK: show_task_override
+│  💡 Task vars override definition vars
+│
+└─ ⚡ STEP: show_task_vars
+   ┌─ 💻 COMMAND: echo "environment = task-staging"
+echo "replicas    = 3"
+echo "region      = us-east-1"
+echo "task_only   = only-visible-in-this-task"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ environment = task-staging
+        │ replicas    = 3
+        │ region      = us-east-1
+        │ task_only   = only-visible-in-this-task
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_task_override' COMPLETED
+│  └─ ✅ SUBTASK 'show_task_override' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_step
+│  ┌─ 🔄 INVOKING SUBTASK: show_step_override
 
-      STEP: step_without_overrides
-        === Inside step without overrides ===
-        environment = task-qa
-        replicas    = 5
+┌─ 🎯 TASK: show_step_override
+│  💡 Step vars override task vars
+│
+├─ ⚡ STEP: step_with_overrides
+│  📝 This step overrides environment and replicas
+│  ┌─ 💻 COMMAND: echo "=== Inside step with overrides ==="
+echo "environment = step-production"
+echo "replicas    = 10"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Inside step with overrides ===
+│       │ environment = step-production
+│       │ replicas    = 10
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: step_without_overrides
+   📝 This step inherits from the task level
+   ┌─ 💻 COMMAND: echo "=== Inside step without overrides ==="
+echo "environment = task-qa"
+echo "replicas    = 5"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Inside step without overrides ===
+        │ environment = task-qa
+        │ replicas    = 5
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_step_override' COMPLETED
+│  └─ ✅ SUBTASK 'show_step_override' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_template
+│  ┌─ 🔄 INVOKING SUBTASK: show_template_vars
 
-    STEP: summary
-      === Variable Precedence (highest to lowest) ===
-        1. Runtime (--var key=value)
-        2. Step vars
-        3. Task vars
-        4. Definition vars (defaults:)
+┌─ 🎯 TASK: show_template_vars
+│  💡 Variables can use template expressions
+│
+└─ ⚡ STEP: computed_variable
+   📝 Build a URL from other variables
+   ┌─ 💻 COMMAND: echo "Base URL:    https://api.example.com"
+echo "API Version: v2"
+echo "Full URL:    https://api.example.com/v2/users"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Base URL:    https://api.example.com
+        │ API Version: v2
+        │ Full URL:    https://api.example.com/v2/users
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_template_vars' COMPLETED
+│  └─ ✅ SUBTASK 'show_template_vars' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Variable Precedence (highest to lowest) ==="
+echo "  1. Runtime (--var key=value)"
+echo "  2. Step vars"
+echo "  3. Task vars"
+echo "  4. Definition vars (defaults:)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Variable Precedence (highest to lowest) ===
+        │   1. Runtime (--var key=value)
+        │   2. Step vars
+        │   3. Task vars
+        │   4. Definition vars (defaults:)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
 
-    WORKFLOW COMPLETED SUCCESSFULLY
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+    type: workflow
+    tests:
+      - name: test_variable_precedence
+        task: main
+        expect:
+          success: true
+          output_contains:
+            - "environment = global-default"
+            - "region      = us-east-1"
+            - "replicas    = 1"
+            - "environment = task-staging"
+            - "replicas    = 3"
+            - "task_only   = only-visible-in-this-task"
+            - "environment = step-production"
+            - "replicas    = 10"
+            - "environment = task-qa"
+            - "replicas    = 5"
+            - "Base URL:    https://api.example.com"
+            - "Full URL:    https://api.example.com/v2/users"
+            - "Variable Precedence (highest to lowest)"
     ```
   </TabItem>
   <TabItem label="Verified">
-    **Lint:** PASS
-    **Run:** PASS (exit 0)
-    **Verified:** 2026-03-27
+    ```
+    VERIFICATION RESULTS:
+      Test: test_variable_precedence
+      Task: main
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "environment = global-default"
+        ✅ Contains "region      = us-east-1"
+        ✅ Contains "replicas    = 1"
+        ✅ Contains "environment = task-staging"
+        ✅ Contains "replicas    = 3"
+        ✅ Contains "task_only   = only-visible-in-this-task"
+        ✅ Contains "environment = step-production"
+        ✅ Contains "replicas    = 10"
+        ✅ Contains "environment = task-qa"
+        ✅ Contains "replicas    = 5"
+        ✅ Contains "Base URL:    https://api.example.com"
+        ✅ Contains "Full URL:    https://api.example.com/v2/users"
+        ✅ Contains "Variable Precedence (highest to lowest)"
+      Result: PASS (13/13 checks)
+    ```
   </TabItem>
 </Tabs>
 
@@ -197,12 +392,25 @@ OrchStep resolves variables with 4-level precedence: Runtime > Step > Task > Def
 Resilient error handling with jitter to prevent thundering herd problems.
 
 <Tabs>
-  <TabItem label="orchstep.yml">
+  <TabItem label="Code">
     ```yaml
+    # Example: Retry with Exponential Backoff and Jitter
+    # Shows how to prevent "thundering herd" problems by adding
+    # random jitter to retry delays.
+    #
+    # jitter: 0.0  = no randomness (deterministic delays)
+    # jitter: 0.3  = +/-30% variation around the calculated delay
+    # jitter: 0.5  = +/-50% variation
+    # jitter: 1.0  = +/-100% variation (0 to 2x the delay)
+    #
+    # Try: orchstep run resilient-deploy
+    # Try: orchstep run api-with-backoff
+
     name: retry-with-jitter-demo
     desc: "Resilient retry with jitter to prevent thundering herd"
 
     tasks:
+      # -- Basic jitter for distributed retries --
       resilient-deploy:
         desc: "Deploy with jitter to avoid retry storms"
         steps:
@@ -210,12 +418,14 @@ Resilient error handling with jitter to prevent thundering herd problems.
             func: shell
             do: |
               echo "Deploying application to cluster..."
+              # In real usage: kubectl apply -f deployment.yml
               echo "Deployment successful"
             retry:
               max_attempts: 5
               interval: 2s
-              jitter: 0.3     # +/-30% variation
+              jitter: 0.3     # +/-30% variation: delays between 1.4s and 2.6s
 
+      # -- Exponential backoff with jitter --
       api-with-backoff:
         desc: "API calls with exponential backoff and jitter"
         steps:
@@ -223,42 +433,153 @@ Resilient error handling with jitter to prevent thundering herd problems.
             func: shell
             do: |
               echo "Calling rate-limited API..."
+              # In real usage: curl https://api.example.com/data
               echo "Response received"
             retry:
               max_attempts: 5
               interval: 100ms
               backoff_rate: 2.0    # Double the delay each time
-              jitter: 0.3          # +/-30% jitter on each delay
+              jitter: 0.3          # +/-30% jitter on each backoff delay
               # Approximate delays:
               # Attempt 1->2: ~100ms  (70ms  - 130ms)
               # Attempt 2->3: ~200ms  (140ms - 260ms)
               # Attempt 3->4: ~400ms  (280ms - 520ms)
               # Attempt 4->5: ~800ms  (560ms - 1040ms)
+
+      # -- Jitter with max delay cap --
+      capped-backoff:
+        desc: "Backoff with jitter capped at a maximum delay"
+        steps:
+          - name: sync_to_remote
+            func: shell
+            do: |
+              echo "Syncing data to remote storage..."
+              echo "Sync complete"
+            retry:
+              max_attempts: 5
+              interval: 100ms
+              backoff_rate: 3.0     # Triple each time (aggressive backoff)
+              max_delay: 500ms      # Never wait more than 500ms
+              jitter: 0.5           # +/-50% on the capped delay
+
+      # -- Multiple steps with independent jitter --
+      parallel-service-calls:
+        desc: "Each step retries with its own jitter pattern"
+        steps:
+          - name: call_auth_service
+            func: shell
+            do: echo "Authenticating with auth service..."
+            retry:
+              max_attempts: 3
+              interval: 100ms
+              jitter: 0.3
+            on_error: warn
+
+          - name: call_data_service
+            func: shell
+            do: echo "Fetching data from data service..."
+            retry:
+              max_attempts: 3
+              interval: 200ms
+              jitter: 0.5
+            on_error: warn
+
+          - name: aggregate_results
+            func: shell
+            do: |
+              echo "Aggregating service responses..."
+              echo "Auth status: {{ steps.call_auth_service.status }}"
+              echo "Data status: {{ steps.call_data_service.status }}"
     ```
   </TabItem>
   <TabItem label="Output">
     ```
-    WORKFLOW: retry-with-jitter-demo
-    Resilient retry with jitter to prevent thundering herd
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: retry-with-jitter-demo
+│ 📋 Resilient retry with jitter to prevent thundering herd
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
-    TASK: resilient-deploy
-      Deploy with jitter to avoid retry storms
+┌─ 🎯 TASK: resilient-deploy
+│  💡 Deploy with jitter to avoid retry storms
+│
+└─ ⚡ STEP: deploy_to_cluster
+   ┌─ 💻 COMMAND: echo "Deploying application to cluster..."
+# In real usage: kubectl apply -f deployment.yml
+echo "Deployment successful"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying application to cluster...
+        │ Deployment successful
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'resilient-deploy' COMPLETED
 
-    STEP: deploy_to_cluster
-      COMMAND: echo "Deploying application to cluster..."  ...
-      OUTPUT:
-        Deploying application to cluster...
-        Deployment successful
-      STEP COMPLETED
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+    type: workflow
+    tests:
+      - name: test_resilient_deploy
+        task: resilient-deploy
+        expect:
+          success: true
+          output_contains:
+            - "Deploying application to cluster..."
+            - "Deployment successful"
 
-    TASK 'resilient-deploy' COMPLETED
-    WORKFLOW COMPLETED SUCCESSFULLY
+      - name: test_api_with_backoff
+        task: api-with-backoff
+        expect:
+          success: true
+          output_contains:
+            - "Calling rate-limited API..."
+            - "Response received"
+
+      - name: test_parallel_service_calls
+        task: parallel-service-calls
+        expect:
+          success: true
+          output_contains:
+            - "Authenticating with auth service..."
+            - "Fetching data from data service..."
+            - "Aggregating service responses..."
     ```
   </TabItem>
   <TabItem label="Verified">
-    **Lint:** PASS
-    **Run:** PASS (exit 0)
-    **Verified:** 2026-03-27
+    ```
+    VERIFICATION RESULTS:
+      Test: test_resilient_deploy
+      Task: resilient-deploy
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "Deploying application to cluster..."
+        ✅ Contains "Deployment successful"
+      Result: PASS
+
+      Test: test_api_with_backoff
+      Task: api-with-backoff
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "Calling rate-limited API..."
+        ✅ Contains "Response received"
+      Result: PASS
+
+      Test: test_parallel_service_calls
+      Task: parallel-service-calls
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "Authenticating with auth service..."
+        ✅ Contains "Fetching data from data service..."
+        ✅ Contains "Aggregating service responses..."
+      Result: PASS
+    ```
   </TabItem>
 </Tabs>
 
@@ -269,8 +590,25 @@ Resilient error handling with jitter to prevent thundering herd problems.
 Built-in HTTP function with response parsing and variable-driven URLs.
 
 <Tabs>
-  <TabItem label="orchstep.yml">
+  <TabItem label="Code">
     ```yaml
+    # Example: Basic HTTP GET Requests
+    # Shows how to make GET requests with the built-in http function.
+    #
+    # The http function supports two syntaxes:
+    #   - Short form:  do: "GET https://api.example.com/data"
+    #   - Args form:   args: { url: "...", method: GET }
+    #
+    # Response data is available via:
+    #   result.status_code   - HTTP status code (200, 404, etc.)
+    #   result.body          - Raw response body as string
+    #   result.data_object   - Auto-parsed JSON response (if JSON)
+    #   result.headers       - Response headers map
+    #   result.url           - Requested URL
+    #   result.method        - HTTP method used
+    #
+    # Try: orchstep run fetch-api-data
+
     name: basic-get-request-demo
     desc: "HTTP GET requests with variable URLs and response parsing"
 
@@ -278,6 +616,7 @@ Built-in HTTP function with response parsing and variable-driven URLs.
       api_base: "https://httpbin.org"
 
     tasks:
+      # -- Simple GET request --
       fetch-api-data:
         desc: "Fetch data from a REST API"
         steps:
@@ -296,6 +635,7 @@ Built-in HTTP function with response parsing and variable-driven URLs.
               echo "URL: {{ steps.get_users.url }}"
               echo "Method: {{ steps.get_users.method }}"
 
+      # -- Parse JSON response --
       parse-json-response:
         desc: "Access fields from a JSON response body"
         steps:
@@ -315,31 +655,70 @@ Built-in HTTP function with response parsing and variable-driven URLs.
   </TabItem>
   <TabItem label="Output">
     ```
-    WORKFLOW: basic-get-request-demo
-    HTTP GET requests with variable URLs and response parsing
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: basic-get-request-demo
+│ 📋 HTTP GET requests with variable URLs and response parsing
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
-    TASK: fetch-api-data
-      Fetch data from a REST API
+┌─ 🎯 TASK: fetch-api-data
+│  💡 Fetch data from a REST API
+│
+├─ ⚡ STEP: get_users
+│  ┌─ 💻 COMMAND: GET https://httpbin.org/get
+│  └─ 📤 OUTPUT: {
+  "args": {},
+  "headers": {
+    "Accept-Encoding": "gzip",
+    "Host": "httpbin.org",
+    "User-Agent": "Go-http-client/2.0",
+    "X-Amzn-Trace-Id": "Root=1-69c64d9a-4d2e17e95d92a13d26d82a62"
+ ... (274 bytes)
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_result
+   ┌─ 💻 COMMAND: echo "Status: 200"
+echo "URL: https://httpbin.org/get"
+echo "Method: GET"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Status: 200
+        │ URL: https://httpbin.org/get
+        │ Method: GET
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'fetch-api-data' COMPLETED
 
-    STEP: get_users
-      COMMAND: GET http://localhost:8080/get
-      OUTPUT: GET request received at /get
-
-    STEP: show_result
-      OUTPUT:
-        Status: 200
-        URL: http://localhost:8080/get
-        Method: GET
-      STEP COMPLETED
-
-    TASK 'fetch-api-data' COMPLETED
-    WORKFLOW COMPLETED SUCCESSFULLY
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+    type: workflow
+    tests:
+      - name: test_fetch_api_data
+        task: fetch-api-data
+        expect:
+          success: true
+          output_contains:
+            - "Status: 200"
+            - "Method: GET"
     ```
   </TabItem>
   <TabItem label="Verified">
-    **Lint:** PASS
-    **Run:** PASS (exit 0, tested with mock HTTP server)
-    **Verified:** 2026-03-27
+    ```
+    VERIFICATION RESULTS:
+      Test: test_fetch_api_data
+      Task: fetch-api-data
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "Status: 200"
+        ✅ Contains "Method: GET"
+      Result: PASS
+      Note: Tested live against https://httpbin.org
+    ```
   </TabItem>
 </Tabs>
 
@@ -350,8 +729,19 @@ Built-in HTTP function with response parsing and variable-driven URLs.
 Build frontend and backend concurrently, then deploy with merged outputs.
 
 <Tabs>
-  <TabItem label="orchstep.yml">
+  <TabItem label="Code">
     ```yaml
+    # Example: Parallel Step Execution
+    # Demonstrates: Running multiple steps concurrently using the parallel: block
+    #
+    # Key concepts:
+    #   - Steps inside parallel: run simultaneously
+    #   - Each parallel step can produce outputs
+    #   - Outputs merge back for subsequent sequential steps
+    #   - If any parallel step fails, the block fails
+    #
+    # Try: orchstep run build-and-deploy
+
     name: parallel-build-demo
     desc: "Build frontend and backend in parallel, then deploy"
 
@@ -398,42 +788,110 @@ Build frontend and backend concurrently, then deploy with merged outputs.
   </TabItem>
   <TabItem label="Output">
     ```
-    WORKFLOW: parallel-build-demo
-    Build frontend and backend in parallel, then deploy
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: parallel-build-demo
+│ 📋 Build frontend and backend in parallel, then deploy
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
-    TASK: build-and-deploy
-      Parallel build followed by sequential deploy
+┌─ 🎯 TASK: build-and-deploy
+│  💡 Parallel build followed by sequential deploy
+│
+├─ ⚡ STEP: build_all
+│  📝 Build both services in parallel
+│  Starting parallel execution of 2 steps
+│  ┌─ 💻 COMMAND: echo "Building backend v2.0.0..."
+echo "Compiling Go..."
+echo "Running unit tests..."
+echo "BACKEND_ARTIFACT=backend-2.0.0"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│  ┌─ 💻 COMMAND: echo "Building frontend v2.0.0..."
+echo "Compiling TypeScript..."
+echo "Bundling assets..."
+echo "FRONTEND_ARTIFACT=frontend-2.0.0.js"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Building frontend v2.0.0...
+│       │ Compiling TypeScript...
+│       │ Bundling assets...
+│       │ FRONTEND_ARTIFACT=frontend-2.0.0.js
+│       │ Building backend v2.0.0...
+│       │ Compiling Go...
+│       │ Running unit tests...
+│       │ BACKEND_ARTIFACT=backend-2.0.0
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  Parallel step 'build_frontend' completed successfully
+│  Parallel step 'build_backend' completed successfully
+│  Parallel block completed: 2/2 succeeded
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: deploy
+   📝 Deploy both artifacts
+   ┌─ 💻 COMMAND: echo "Deploying to staging..."
+echo "Frontend: frontend-2.0.0.js"
+echo "Backend: backend-2.0.0"
+echo "Deploy complete!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to staging...
+        │ Frontend: frontend-2.0.0.js
+        │ Backend: backend-2.0.0
+        │ Deploy complete!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'build-and-deploy' COMPLETED
 
-    STEP: build_all — Build both services in parallel
-      Starting parallel execution of 2 steps
-        Building frontend v2.0.0...
-        Building backend v2.0.0...
-        Compiling TypeScript...
-        Compiling Go...
-        Bundling assets...
-        FRONTEND_ARTIFACT=frontend-2.0.0.js
-        Running unit tests...
-        BACKEND_ARTIFACT=backend-2.0.0
-      Parallel step 'build_frontend' completed successfully
-      Parallel step 'build_backend' completed successfully
-      Parallel block completed: 2/2 succeeded
-
-    STEP: deploy — Deploy both artifacts
-      OUTPUT:
-        Deploying to staging...
-        Frontend: frontend-2.0.0.js
-        Backend: backend-2.0.0
-        Deploy complete!
-      STEP COMPLETED
-
-    TASK 'build-and-deploy' COMPLETED
-    WORKFLOW COMPLETED SUCCESSFULLY
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+    type: workflow
+    tests:
+      - name: test_parallel_build
+        task: build-and-deploy
+        expect:
+          success: true
+          output_contains:
+            - "Building frontend v2.0.0..."
+            - "Compiling TypeScript..."
+            - "Bundling assets..."
+            - "FRONTEND_ARTIFACT=frontend-2.0.0.js"
+            - "Building backend v2.0.0..."
+            - "Compiling Go..."
+            - "Running unit tests..."
+            - "BACKEND_ARTIFACT=backend-2.0.0"
+            - "Deploying to staging..."
+            - "Frontend: frontend-2.0.0.js"
+            - "Backend: backend-2.0.0"
+            - "Deploy complete!"
     ```
   </TabItem>
   <TabItem label="Verified">
-    **Lint:** PASS
-    **Run:** PASS (exit 0)
-    **Verified:** 2026-03-27
+    ```
+    VERIFICATION RESULTS:
+      Test: test_parallel_build
+      Task: build-and-deploy
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "Building frontend v2.0.0..."
+        ✅ Contains "Compiling TypeScript..."
+        ✅ Contains "Bundling assets..."
+        ✅ Contains "FRONTEND_ARTIFACT=frontend-2.0.0.js"
+        ✅ Contains "Building backend v2.0.0..."
+        ✅ Contains "Compiling Go..."
+        ✅ Contains "Running unit tests..."
+        ✅ Contains "BACKEND_ARTIFACT=backend-2.0.0"
+        ✅ Contains "Deploying to staging..."
+        ✅ Contains "Frontend: frontend-2.0.0.js"
+        ✅ Contains "Backend: backend-2.0.0"
+        ✅ Contains "Deploy complete!"
+      Result: PASS (12/12 checks)
+    ```
   </TabItem>
 </Tabs>
 
@@ -444,8 +902,18 @@ Build frontend and backend concurrently, then deploy with merged outputs.
 A realistic production pipeline: build, test, assert, deploy, health-check, and smoke-test.
 
 <Tabs>
-  <TabItem label="orchstep.yml">
+  <TabItem label="Code">
     ```yaml
+    # Example: Deploy Pipeline
+    # A realistic deployment pipeline that combines multiple OrchStep features:
+    #   - Variables for configuration
+    #   - Shell commands for build and deploy
+    #   - HTTP health checks with retry
+    #   - Assertions to validate success
+    #
+    # Try: orchstep run
+    # Try: orchstep run --var environment=staging --var version=v2.1.0
+
     name: deploy-pipeline
     desc: "Production deployment pipeline with health checks and validation"
 
@@ -459,6 +927,7 @@ A realistic production pipeline: build, test, assert, deploy, health-check, and 
       rollback_on_failure: true
 
     tasks:
+      # --- Step 1: Build ---
       build:
         desc: "Build the container image"
         steps:
@@ -495,6 +964,7 @@ A realistic production pipeline: build, test, assert, deploy, health-check, and 
               echo "Pushing {{ steps.compile.image_tag }}"
               echo "Image pushed successfully"
 
+      # --- Step 2: Deploy ---
       deploy:
         desc: "Deploy to the target environment"
         steps:
@@ -510,8 +980,13 @@ A realistic production pipeline: build, test, assert, deploy, health-check, and 
             do: |
               echo "Starting rolling deployment..."
               echo "Scaling {{ vars.app_name }} to {{ vars.replicas }} replicas"
+              echo "Deployment ID: deploy-{{ vars.environment }}-$(date +%s)"
               echo "All replicas healthy"
+            outputs:
+              deploy_id: "deploy-{{ vars.environment }}-001"
+              status: "deployed"
 
+      # --- Step 3: Verify ---
       verify:
         desc: "Health check and validation"
         steps:
@@ -521,10 +996,23 @@ A realistic production pipeline: build, test, assert, deploy, health-check, and 
             do: |
               echo "Checking health at {{ vars.health_check_url }}"
               echo "Status: 200 OK"
+              echo "Response: {\"status\":\"healthy\",\"version\":\"{{ vars.version }}\"}"
+            outputs:
+              http_status: 200
+              response: '{"status":"healthy","version":"{{ vars.version }}"}'
             retry:
               max: 5
               delay: 3
               backoff: 2
+
+          - name: validate_health
+            func: assert
+            args:
+              conditions:
+                - condition: "steps.health_check.http_status === 200"
+                  desc: "Health endpoint returns 200"
+                - condition: '{{ contains "healthy" steps.health_check.response }}'
+                  desc: "Service reports healthy status"
 
           - name: smoke_test
             func: shell
@@ -534,15 +1022,19 @@ A realistic production pipeline: build, test, assert, deploy, health-check, and 
               echo "GET  /api/payments/1 -- 200 OK"
               echo "All smoke tests passed"
 
+      # --- Orchestrator ---
       main:
         desc: "Run the full deploy pipeline"
         steps:
           - name: run_build
             task: build
+
           - name: run_deploy
             task: deploy
+
           - name: run_verify
             task: verify
+
           - name: report
             func: shell
             do: |
@@ -559,58 +1051,226 @@ A realistic production pipeline: build, test, assert, deploy, health-check, and 
   </TabItem>
   <TabItem label="Output">
     ```
-    WORKFLOW: deploy-pipeline
-    Production deployment pipeline with health checks and validation
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: deploy-pipeline
+│ 📋 Production deployment pipeline with health checks and validation
+╰─────────────────────────────────────────────────────────────────────────────────╯
 
-    TASK: build
-      === Build Phase ===
-      Building payments-api:v1.0.0
-      Build completed at 19:14:50
+┌─ 🎯 TASK: main
+│  💡 Run the full deploy pipeline
+│
+├─ ⚡ STEP: run_build
+│  ┌─ 🔄 INVOKING SUBTASK: build
 
-      Running unit tests...
-      42 tests passed, 0 failed
+┌─ 🎯 TASK: build
+│  💡 Build the container image
+│
+├─ ⚡ STEP: compile
+│  ┌─ 💻 COMMAND: echo "=== Build Phase ==="
+echo "Building payments-api:v1.0.0"
+echo "Build completed at $(date +%H:%M:%S)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Build Phase ===
+│       │ Building payments-api:v1.0.0
+│       │ Build completed at 20:27:55
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_tests
+│  ┌─ 💻 COMMAND: echo "Running unit tests..."
+echo "42 tests passed, 0 failed"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Running unit tests...
+│       │ 42 tests passed, 0 failed
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: verify_tests
+│  ┌─ 🔍 ASSERTION: steps.run_tests.tests_failed === 0
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: steps.run_tests.tests_passed > 0
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 2 conditions passed
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: push_image
+   ┌─ 💻 COMMAND: echo "Pushing registry.example.com/payments-api:v1.0.0"
+echo "Image pushed successfully"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Pushing registry.example.com/payments-api:v1.0.0
+        │ Image pushed successfully
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'build' COMPLETED
+│  └─ ✅ SUBTASK 'build' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_deploy
+│  ┌─ 🔄 INVOKING SUBTASK: deploy
 
-      ASSERTION: steps.run_tests.tests_failed === 0 — PASSED
-      ASSERTION: steps.run_tests.tests_passed > 0 — PASSED
-      All 2 conditions passed
+┌─ 🎯 TASK: deploy
+│  💡 Deploy to the target environment
+│
+├─ ⚡ STEP: pre_deploy_check
+│  ┌─ 💻 COMMAND: echo "=== Deploy Phase ==="
+echo "Environment: production"
+echo "Replicas:    3"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploy Phase ===
+│       │ Environment: production
+│       │ Replicas:    3
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: rolling_deploy
+   ┌─ 💻 COMMAND: echo "Starting rolling deployment..."
+echo "Scaling payments-api to 3 replicas"
+echo "Deployment ID: deploy-production-$(date +%s)"
+echo "All replicas healthy"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Starting rolling deployment...
+        │ Scaling payments-api to 3 replicas
+        │ Deployment ID: deploy-production-1774603676
+        │ All replicas healthy
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy' COMPLETED
+│  └─ ✅ SUBTASK 'deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_verify
+│  ┌─ 🔄 INVOKING SUBTASK: verify
 
-      Pushing registry.example.com/payments-api:v1.0.0
-      Image pushed successfully
+┌─ 🎯 TASK: verify
+│  💡 Health check and validation
+│
+├─ ⚡ STEP: health_check
+│  📝 Check service health (retries on failure)
+│  ┌─ 💻 COMMAND: echo "Checking health at https://payments-api.example.com/health"
+echo "Status: 200 OK"
+echo "Response: {\"status\":\"healthy\",\"version\":\"v1.0.0\"}"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Checking health at https://payments-api.example.com/health
+│       │ Status: 200 OK
+│       │ Response: {"status":"healthy","version":"v1.0.0"}
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_health
+│  ┌─ 🔍 ASSERTION: steps.health_check.http_status === 200
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: {{ contains "healthy" steps.health_check.response }}
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 2 conditions passed
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: smoke_test
+   ┌─ 💻 COMMAND: echo "Running smoke tests against production..."
+echo "POST /api/payments -- 201 Created"
+echo "GET  /api/payments/1 -- 200 OK"
+echo "All smoke tests passed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Running smoke tests against production...
+        │ POST /api/payments -- 201 Created
+        │ GET  /api/payments/1 -- 200 OK
+        │ All smoke tests passed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'verify' COMPLETED
+│  └─ ✅ SUBTASK 'verify' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: report
+   ┌─ 💻 COMMAND: echo ""
+echo "=========================================="
+echo "  Deployment Complete"
+echo "=========================================="
+echo "  App:         payments-api"
+echo "  Version:     v1.0.0"
+echo "  Environment: production"
+echo "  Replicas:    3"
+echo "=========================================="
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │
+        │ ==========================================
+        │   Deployment Complete
+        │ ==========================================
+        │   App:         payments-api
+        │   Version:     v1.0.0
+        │   Environment: production
+        │   Replicas:    3
+        │ ==========================================
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
 
-    TASK: deploy
-      === Deploy Phase ===
-      Environment: production
-      Replicas:    3
-
-      Starting rolling deployment...
-      Scaling payments-api to 3 replicas
-      All replicas healthy
-
-    TASK: verify
-      Checking health at https://payments-api.example.com/health
-      Status: 200 OK
-
-      Running smoke tests against production...
-      POST /api/payments -- 201 Created
-      GET  /api/payments/1 -- 200 OK
-      All smoke tests passed
-
-    STEP: report
-      ==========================================
-        Deployment Complete
-      ==========================================
-        App:         payments-api
-        Version:     v1.0.0
-        Environment: production
-        Replicas:    3
-      ==========================================
-
-    WORKFLOW COMPLETED SUCCESSFULLY
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+    type: workflow
+    tests:
+      - name: test_deploy_pipeline
+        task: main
+        expect:
+          success: true
+          output_contains:
+            - "=== Build Phase ==="
+            - "Building payments-api:v1.0.0"
+            - "Running unit tests..."
+            - "42 tests passed, 0 failed"
+            - "ASSERTION PASSED"
+            - "Pushing registry.example.com/payments-api:v1.0.0"
+            - "Image pushed successfully"
+            - "=== Deploy Phase ==="
+            - "Environment: production"
+            - "Replicas:    3"
+            - "Starting rolling deployment..."
+            - "Scaling payments-api to 3 replicas"
+            - "All replicas healthy"
+            - "Checking health at https://payments-api.example.com/health"
+            - "Status: 200 OK"
+            - "All smoke tests passed"
+            - "Deployment Complete"
     ```
   </TabItem>
   <TabItem label="Verified">
-    **Lint:** PASS
-    **Run:** PASS (exit 0)
-    **Verified:** 2026-03-27
+    ```
+    VERIFICATION RESULTS:
+      Test: test_deploy_pipeline
+      Task: main
+      Expected: success=true
+      Actual: success=true (exit code 0)
+      Output checks:
+        ✅ Contains "=== Build Phase ==="
+        ✅ Contains "Building payments-api:v1.0.0"
+        ✅ Contains "Running unit tests..."
+        ✅ Contains "42 tests passed, 0 failed"
+        ✅ Contains "ASSERTION PASSED"
+        ✅ Contains "Pushing registry.example.com/payments-api:v1.0.0"
+        ✅ Contains "Image pushed successfully"
+        ✅ Contains "=== Deploy Phase ==="
+        ✅ Contains "Environment: production"
+        ✅ Contains "Replicas:    3"
+        ✅ Contains "Starting rolling deployment..."
+        ✅ Contains "Scaling payments-api to 3 replicas"
+        ✅ Contains "All replicas healthy"
+        ✅ Contains "Checking health at https://payments-api.example.com/health"
+        ✅ Contains "Status: 200 OK"
+        ✅ Contains "All smoke tests passed"
+        ✅ Contains "Deployment Complete"
+      Result: PASS (17/17 checks)
+    ```
   </TabItem>
 </Tabs>
