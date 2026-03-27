@@ -27,7 +27,7 @@ orchstep run greet
 
 ```yaml
 name: deploy
-vars:
+defaults:
   env: staging
   version: "1.0.0"
 

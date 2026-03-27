@@ -102,7 +102,7 @@ steps:
 Transform can modify `vars` within the current task scope:
 
 ```yaml
-vars:
+defaults:
   counter: 0
 
 tasks:
@@ -150,7 +150,7 @@ steps:
     func: assert
     args:
       condition: "steps.validate.valid"
-      message: "Configuration validation failed"
+      desc: "Configuration validation failed"
 ```
 
 ### Adaptive Deployment Strategy

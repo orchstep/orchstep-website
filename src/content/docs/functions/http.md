@@ -121,7 +121,7 @@ steps:
 Pass a complex variable structure as the request body:
 
 ```yaml
-vars:
+defaults:
   payload:
     user:
       name: "{{ vars.username }}"
@@ -174,5 +174,5 @@ steps:
     func: assert
     args:
       condition: '{{ eq steps.health_check.status_code 200 }}'
-      message: "Health check must return 200"
+      desc: "Health check must return 200"
 ```

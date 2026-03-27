@@ -69,7 +69,7 @@ steps:
     func: assert
     args:
       condition: '{{ eq steps.build.status "success" }}'
-      message: "Build must succeed"
+      desc: "Build must succeed"
 ```
 
 ### Environment Variables

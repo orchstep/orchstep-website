@@ -11,7 +11,7 @@ Validate conditions using Go template expressions or JavaScript. Fails the step 
 |-----------|------|----------|-------------|
 | `func` | string | yes | Must be `assert` |
 | `args.condition` | string | yes | Expression to evaluate. Supports Go templates (`{{ }}`) and JavaScript syntax. |
-| `args.message` | string | no | Error message displayed when assertion fails |
+| `args.desc` | string | no | Error message displayed when assertion fails |
 
 ### Dual Syntax
 
@@ -39,7 +39,7 @@ steps:
     func: assert
     args:
       condition: '{{ eq steps.build.exit_code 0 }}'
-      message: "Build must succeed before deployment"
+      desc: "Build must succeed before deployment"
 ```
 
 ### Go Template Comparisons
@@ -50,19 +50,19 @@ steps:
     func: assert
     args:
       condition: '{{ ne vars.version "" }}'
-      message: "Version must not be empty"
+      desc: "Version must not be empty"
 
   - name: check_count
     func: assert
     args:
       condition: '{{ gt vars.replicas 0 }}'
-      message: "Must have at least 1 replica"
+      desc: "Must have at least 1 replica"
 
   - name: check_combined
     func: assert
     args:
       condition: '{{ and (eq vars.env "prod") (gt vars.replicas 2) }}'
-      message: "Production requires 3+ replicas"
+      desc: "Production requires 3+ replicas"
 ```
 
 ### String Matching (Go Templates)
@@ -73,19 +73,19 @@ steps:
     func: assert
     args:
       condition: '{{ contains steps.build.output "SUCCESS" }}'
-      message: "Build output must contain SUCCESS"
+      desc: "Build output must contain SUCCESS"
 
   - name: check_prefix
     func: assert
     args:
       condition: '{{ hasPrefix vars.version "v" }}'
-      message: "Version must start with v"
+      desc: "Version must start with v"
 
   - name: check_regex
     func: assert
     args:
       condition: '{{ regexMatch "v[0-9]+\\.[0-9]+" vars.version }}'
-      message: "Version must match semver pattern"
+      desc: "Version must match semver pattern"
 ```
 
 ### JavaScript Syntax
@@ -96,13 +96,13 @@ steps:
     func: assert
     args:
       condition: 'steps.api_call.status_code >= 200 && steps.api_call.status_code < 300'
-      message: "API call must return 2xx status"
+      desc: "API call must return 2xx status"
 
   - name: check_string
     func: assert
     args:
       condition: 'steps.build.output.includes("SUCCESS")'
-      message: "Build must succeed"
+      desc: "Build must succeed"
 ```
 
 ### Aggregation Helpers (JavaScript)
@@ -115,19 +115,19 @@ steps:
     func: assert
     args:
       condition: 'all(steps.batch_requests.outputs, "status_code", 200)'
-      message: "All batch requests must return 200"
+      desc: "All batch requests must return 200"
 
   - name: check_count
     func: assert
     args:
       condition: 'count(steps.results.outputs) === 5'
-      message: "Should have exactly 5 results"
+      desc: "Should have exactly 5 results"
 
   - name: check_average
     func: assert
     args:
       condition: 'avg(steps.perf_tests.outputs, "response_time") < 500'
-      message: "Average response time must be under 500ms"
+      desc: "Average response time must be under 500ms"
 ```
 
 **Available helpers:**
@@ -160,11 +160,11 @@ tasks:
         func: assert
         args:
           condition: '{{ eq steps.health_check.status_code 200 }}'
-          message: "Service must be healthy after deployment"
+          desc: "Service must be healthy after deployment"
 
       - name: assert_version
         func: assert
         args:
           condition: 'steps.health_check.data.version === vars.expected_version'
-          message: "Deployed version must match expected version"
+          desc: "Deployed version must match expected version"
 ```

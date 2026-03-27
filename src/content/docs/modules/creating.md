@@ -64,7 +64,7 @@ dependencies:
 name: ci-cd-module
 desc: "CI/CD pipeline module"
 
-vars:
+defaults:
   registry_url: ""
   app_name: ""
   replicas: 2
@@ -91,7 +91,7 @@ tasks:
         func: assert
         args:
           condition: '{{ eq steps.unit_tests.exit_code 0 }}'
-          message: "Tests must pass"
+          desc: "Tests must pass"
 
   deploy:
     desc: "Deploy to target environment"
@@ -123,7 +123,7 @@ tasks:
         func: assert
         args:
           condition: '{{ eq steps.health_check.status_code 200 }}'
-          message: "Health check must pass after deployment"
+          desc: "Health check must pass after deployment"
 
   rollback:
     desc: "Rollback to previous version"

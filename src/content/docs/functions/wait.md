@@ -74,7 +74,7 @@ steps:
     func: assert
     args:
       condition: '{{ eq steps.check_canary.status_code 200 }}'
-      message: "Canary must be healthy before full rollout"
+      desc: "Canary must be healthy before full rollout"
 
   - name: full_rollout
     func: shell

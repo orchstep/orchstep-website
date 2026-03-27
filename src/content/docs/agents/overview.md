@@ -15,7 +15,7 @@ Agents write OrchStep YAML workflows for task orchestration. A workflow is defin
 name: my-workflow
 desc: "What this workflow does"
 
-vars:
+defaults:
   env: staging
   version: "1.0.0"
 
