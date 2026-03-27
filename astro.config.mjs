@@ -67,6 +67,12 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Demos',
+					items: [
+						{ label: 'Use Cases', slug: 'demos/use-cases' },
+					],
+				},
+				{
 					label: 'Pro Features',
 					items: [
 						{ label: 'Overview', slug: 'pro/overview' },
