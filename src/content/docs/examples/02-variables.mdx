@@ -1,0 +1,1035 @@
+---
+title: "Variables Examples"
+description: "OrchStep examples for variables, scoping, and precedence"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## dynamic variaules
+
+Dynamic Variables with Step Outputs
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Dynamic Variables with Step Outputs
+# Steps can produce outputs that subsequent steps consume.
+# This creates a data pipeline where each step builds on previous results.
+#
+# Key concepts:
+#   - "outputs:" captures values from a step
+#   - "{{ steps.<step_name>.<output_key> }}" references them later
+#   - Outputs can combine step results with variables
+#
+# Try: orchstep run
+
+name: dynamic-variables-demo
+desc: "Pass data between steps using outputs"
+
+defaults:
+  registry_host: "registry.example.com"
+  namespace: "production"
+  app_name: "web-api"
+
+tasks:
+  main:
+    desc: "Docker build and deploy pipeline showing dynamic variables"
+    steps:
+      - name: build_image
+        desc: "Build the Docker image and capture metadata"
+        func: shell
+        do: |
+          echo "Building Docker image..."
+          echo "Image: {{ vars.app_name }}:v2.1.0"
+          echo "Build complete."
+        outputs:
+          image_tag: "v2.1.0"
+          image_name: "{{ vars.app_name }}"
+          full_image: "{{ vars.app_name }}:v2.1.0"
+
+      - name: tag_for_registry
+        desc: "Tag the image for the remote registry"
+        func: shell
+        do: |
+          echo "Tagging {{ steps.build_image.full_image }}"
+          echo "  as {{ vars.registry_host }}/{{ steps.build_image.full_image }}"
+        outputs:
+          tagged_image: "{{ vars.registry_host }}/{{ steps.build_image.image_name }}:{{ steps.build_image.image_tag }}"
+
+      - name: push_image
+        desc: "Push the tagged image to the registry"
+        func: shell
+        do: echo "Pushing {{ steps.tag_for_registry.tagged_image }}"
+        outputs:
+          registry_uri: "{{ steps.tag_for_registry.tagged_image }}"
+          push_status: "completed"
+
+      - name: deploy
+        desc: "Deploy the pushed image to Kubernetes"
+        func: shell
+        do: |
+          echo "kubectl set image deployment/{{ vars.app_name }} \
+            {{ vars.app_name }}={{ steps.push_image.registry_uri }} \
+            -n {{ vars.namespace }}"
+        outputs:
+          deployed_image: "{{ steps.push_image.registry_uri }}"
+
+      - name: summary
+        desc: "Show the full pipeline result"
+        func: shell
+        do: |
+          echo "=== Deployment Summary ==="
+          echo "Image:    {{ steps.build_image.full_image }}"
+          echo "Registry: {{ steps.push_image.registry_uri }}"
+          echo "Status:   {{ steps.push_image.push_status }}"
+          echo "Deployed: {{ steps.deploy.deployed_image }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: dynamic-variables-demo
+│ 📋 Pass data between steps using outputs
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Docker build and deploy pipeline showing dynamic variables
+│
+├─ ⚡ STEP: build_image
+│  📝 Build the Docker image and capture metadata
+│  ┌─ 💻 COMMAND: echo "Building Docker image..."
+echo "Image: web-api:v2.1.0"
+echo "Build complete."
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Building Docker image...
+│       │ Image: web-api:v2.1.0
+│       │ Build complete.
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: tag_for_registry
+│  📝 Tag the image for the remote registry
+│  ┌─ 💻 COMMAND: echo "Tagging web-api:v2.1.0"
+echo "  as registry.example.com/web-api:v2.1.0"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Tagging web-api:v2.1.0
+│       │   as registry.example.com/web-api:v2.1.0
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: push_image
+│  📝 Push the tagged image to the registry
+│  ┌─ 💻 COMMAND: echo "Pushing registry.example.com/web-api:v2.1.0"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Pushing registry.example.com/web-api:v2.1.0
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy
+│  📝 Deploy the pushed image to Kubernetes
+│  ┌─ 💻 COMMAND: echo "kubectl set image deployment/web-api \
+  web-api=registry.example.com/web-api:v2.1.0 \
+  -n production"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ kubectl set image deployment/web-api   web-api=registry.example.com/web-api:v2.1.0   -n production
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   📝 Show the full pipeline result
+   ┌─ 💻 COMMAND: echo "=== Deployment Summary ==="
+echo "Image:    web-api:v2.1.0"
+echo "Registry: registry.example.com/web-api:v2.1.0"
+echo "Status:   completed"
+echo "Deployed: registry.example.com/web-api:v2.1.0"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Deployment Summary ===
+        │ Image:    web-api:v2.1.0
+        │ Registry: registry.example.com/web-api:v2.1.0
+        │ Status:   completed
+        │ Deployed: registry.example.com/web-api:v2.1.0
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_variable_precedence
+    task: main
+    expect:
+      success: true
+      output_contains:
+        - "environment = global-default"
+        - "region      = us-east-1"
+        - "replicas    = 1"
+        - "environment = task-staging"
+        - "replicas    = 3"
+        - "task_only   = only-visible-in-this-task"
+        - "environment = step-production"
+        - "replicas    = 10"
+        - "environment = task-qa"
+        - "replicas    = 5"
+        - "Base URL:    https://api.example.com"
+        - "Full URL:    https://api.example.com/v2/users"
+        - "Variable Precedence (highest to lowest)"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## structured data
+
+Structured Data with map_in / map_out
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Structured Data with map_in / map_out
+# For complex data transformations, OrchStep provides JavaScript-powered
+# "map_in" and "map_out" blocks that run before and after a step.
+#
+# Key concepts:
+#   - map_in:  JavaScript that sets spec.* variables BEFORE the step runs
+#              (available as {{ vars.* }} inside "do:")
+#   - map_out: JavaScript that reads result.output AFTER the step runs
+#              and sets spec.* variables (available in "outputs:")
+#   - Transient scope: map_in/map_out vars only live during that step
+#   - "utils" helpers: parseJSON, toJSON, toYAML, upper, unique, sum, etc.
+#
+# Try: orchstep run
+
+name: structured-data-demo
+desc: "Transform data with map_in and map_out (JavaScript)"
+
+tasks:
+  main:
+    desc: "Data transformation pipeline"
+    steps:
+      # map_in: inject computed variables before shell execution
+      - name: build_greeting
+        desc: "Use map_in to prepare variables"
+        func: shell
+        map_in: |
+          spec.greeting = "Hello";
+          spec.name = "OrchStep User";
+        do: echo '{{ vars.greeting }}, {{ vars.name }}!'
+        outputs:
+          message: "{{ result.output }}"
+
+      # map_out: parse and transform command output
+      - name: parse_status
+        desc: "Use map_out to parse structured output"
+        func: shell
+        do: echo 'status=success,count=42'
+        map_out: |
+          const output = result.output.trim();
+          const parts = output.split(',');
+          spec.status = parts[0].split('=')[1];
+          spec.count = parseInt(parts[1].split('=')[1]);
+        outputs:
+          status: "{{ vars.status }}"
+          count: "{{ vars.count }}"
+
+      # Both map_in and map_out on the same step
+      - name: transform_user_id
+        desc: "Use both map_in and map_out together"
+        func: shell
+        map_in: |
+          spec.prefix = "USR";
+          spec.id = "00042";
+        do: echo '{{ vars.prefix }}-{{ vars.id }}'
+        map_out: |
+          spec.user_id = result.output.trim();
+          spec.is_valid = result.output.includes("USR-");
+        outputs:
+          user_id: "{{ vars.user_id }}"
+          valid: "{{ vars.is_valid }}"
+
+      # Parse JSON output with the utils helper
+      - name: parse_json_output
+        desc: "Use utils.parseJSON in map_out"
+        func: shell
+        do: |
+          echo '{"status":"ok","items":[1,2,3,4,5]}'
+        map_out: |
+          const data = utils.parseJSON(result.output);
+          spec.api_status = data.status;
+          spec.item_count = data.items.length.toString();
+          spec.item_total = utils.sum(data.items).toString();
+        outputs:
+          api_status: "{{ vars.api_status }}"
+          item_count: "{{ vars.item_count }}"
+          item_total: "{{ vars.item_total }}"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Structured Data Results ==="
+          echo "Greeting:   {{ steps.build_greeting.message }}"
+          echo "Status:     {{ steps.parse_status.status }}"
+          echo "Count:      {{ steps.parse_status.count }}"
+          echo "User ID:    {{ steps.transform_user_id.user_id }}"
+          echo "Valid:      {{ steps.transform_user_id.valid }}"
+          echo "API Status: {{ steps.parse_json_output.api_status }}"
+          echo "Items:      {{ steps.parse_json_output.item_count }} (total: {{ steps.parse_json_output.item_total }})"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: structured-data-demo
+│ 📋 Transform data with map_in and map_out (JavaScript)
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Data transformation pipeline
+│
+├─ ⚡ STEP: build_greeting
+│  📝 Use map_in to prepare variables
+│  ┌─ 💻 COMMAND: echo 'Hello, OrchStep User!'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Hello, OrchStep User!
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: parse_status
+│  📝 Use map_out to parse structured output
+│  ┌─ 💻 COMMAND: echo 'status=success,count=42'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ status=success,count=42
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: transform_user_id
+│  📝 Use both map_in and map_out together
+│  ┌─ 💻 COMMAND: echo 'USR-00042'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ USR-00042
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: parse_json_output
+│  📝 Use utils.parseJSON in map_out
+│  ┌─ 💻 COMMAND: echo '{"status":"ok","items":[1,2,3,4,5]}'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ {"status":"ok","items":[1,2,3,4,5]}
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Structured Data Results ==="
+echo "Greeting:   Hello, OrchStep User!"
+echo "Status:     success"
+echo "Count:      42"
+echo "User ID:    USR-00042"
+echo "Valid:      true"
+echo "API Status: ok"
+echo "Items:      5 (total: 15)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Structured Data Results ===
+        │ Greeting:   Hello, OrchStep User!
+        │ Status:     success
+        │ Count:      42
+        │ User ID:    USR-00042
+        │ Valid:      true
+        │ API Status: ok
+        │ Items:      5 (total: 15)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## variaule precedence
+
+Variable Precedence
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Variable Precedence
+# Full demonstration of how OrchStep resolves variables when the same
+# name is defined at multiple levels. Higher levels always win:
+#
+#   Runtime (--var) > Step vars > Task vars > Definition vars
+#
+# This example uses multiple tasks to show each layer in isolation.
+#
+# Try: orchstep run
+# Try: orchstep run test_step_override
+# Try: orchstep run --var multi_level="from-runtime"
+
+name: variable-precedence-demo
+desc: "Shows how variables at different levels override each other"
+
+# Definition variables (lowest priority in-file)
+defaults:
+  environment: "global-default"
+  region: "us-east-1"
+  replicas: "1"
+  multi_level: "from-definition"
+  app_name: "my-app"
+
+tasks:
+  # Shows definition-level vars when no overrides exist
+  show_definition_vars:
+    desc: "Display definition-level defaults"
+    steps:
+      - name: show_globals
+        func: shell
+        do: |
+          echo "environment = {{ vars.environment }}"
+          echo "region      = {{ vars.region }}"
+          echo "replicas    = {{ vars.replicas }}"
+
+  # Task vars override definition vars
+  show_task_override:
+    desc: "Task vars override definition vars"
+    vars:
+      environment: "task-staging"
+      replicas: "3"
+      task_only: "only-visible-in-this-task"
+    steps:
+      - name: show_task_vars
+        func: shell
+        do: |
+          echo "environment = {{ vars.environment }}"
+          echo "replicas    = {{ vars.replicas }}"
+          echo "region      = {{ vars.region }}"
+          echo "task_only   = {{ vars.task_only }}"
+
+  # Step vars override task vars (and definition vars)
+  show_step_override:
+    desc: "Step vars override task vars"
+    vars:
+      environment: "task-qa"
+      replicas: "5"
+    steps:
+      - name: step_with_overrides
+        desc: "This step overrides environment and replicas"
+        vars:
+          environment: "step-production"
+          replicas: "10"
+        func: shell
+        do: |
+          echo "=== Inside step with overrides ==="
+          echo "environment = {{ vars.environment }}"
+          echo "replicas    = {{ vars.replicas }}"
+
+      - name: step_without_overrides
+        desc: "This step inherits from the task level"
+        func: shell
+        do: |
+          echo "=== Inside step without overrides ==="
+          echo "environment = {{ vars.environment }}"
+          echo "replicas    = {{ vars.replicas }}"
+
+  # Template expressions in variable values
+  show_template_vars:
+    desc: "Variables can use template expressions"
+    vars:
+      base_url: "https://api.example.com"
+      api_version: "v2"
+    steps:
+      - name: computed_variable
+        desc: "Build a URL from other variables"
+        vars:
+          full_url: "{{ vars.base_url }}/{{ vars.api_version }}/users"
+        func: shell
+        do: |
+          echo "Base URL:    {{ vars.base_url }}"
+          echo "API Version: {{ vars.api_version }}"
+          echo "Full URL:    {{ vars.full_url }}"
+
+  # Main orchestrator runs all demos
+  main:
+    desc: "Run all precedence demonstrations"
+    steps:
+      - name: demo_definition
+        task: show_definition_vars
+
+      - name: demo_task
+        task: show_task_override
+
+      - name: demo_step
+        task: show_step_override
+
+      - name: demo_template
+        task: show_template_vars
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Variable Precedence (highest to lowest) ==="
+          echo "  1. Runtime (--var key=value)"
+          echo "  2. Step vars"
+          echo "  3. Task vars"
+          echo "  4. Definition vars (defaults:)"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: variable-precedence-demo
+│ 📋 Shows how variables at different levels override each other
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run all precedence demonstrations
+│
+├─ ⚡ STEP: demo_definition
+│  ┌─ 🔄 INVOKING SUBTASK: show_definition_vars
+
+┌─ 🎯 TASK: show_definition_vars
+│  💡 Display definition-level defaults
+│
+└─ ⚡ STEP: show_globals
+   ┌─ 💻 COMMAND: echo "environment = global-default"
+echo "region      = us-east-1"
+echo "replicas    = 1"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ environment = global-default
+        │ region      = us-east-1
+        │ replicas    = 1
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_definition_vars' COMPLETED
+│  └─ ✅ SUBTASK 'show_definition_vars' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_task
+│  ┌─ 🔄 INVOKING SUBTASK: show_task_override
+
+┌─ 🎯 TASK: show_task_override
+│  💡 Task vars override definition vars
+│
+└─ ⚡ STEP: show_task_vars
+   ┌─ 💻 COMMAND: echo "environment = task-staging"
+echo "replicas    = 3"
+echo "region      = us-east-1"
+echo "task_only   = only-visible-in-this-task"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ environment = task-staging
+        │ replicas    = 3
+        │ region      = us-east-1
+        │ task_only   = only-visible-in-this-task
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_task_override' COMPLETED
+│  └─ ✅ SUBTASK 'show_task_override' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_step
+│  ┌─ 🔄 INVOKING SUBTASK: show_step_override
+
+┌─ 🎯 TASK: show_step_override
+│  💡 Step vars override task vars
+│
+├─ ⚡ STEP: step_with_overrides
+│  📝 This step overrides environment and replicas
+│  ┌─ 💻 COMMAND: echo "=== Inside step with overrides ==="
+echo "environment = step-production"
+echo "replicas    = 10"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Inside step with overrides ===
+│       │ environment = step-production
+│       │ replicas    = 10
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: step_without_overrides
+   📝 This step inherits from the task level
+   ┌─ 💻 COMMAND: echo "=== Inside step without overrides ==="
+echo "environment = task-qa"
+echo "replicas    = 5"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Inside step without overrides ===
+        │ environment = task-qa
+        │ replicas    = 5
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_step_override' COMPLETED
+│  └─ ✅ SUBTASK 'show_step_override' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_template
+│  ┌─ 🔄 INVOKING SUBTASK: show_template_vars
+
+┌─ 🎯 TASK: show_template_vars
+│  💡 Variables can use template expressions
+│
+└─ ⚡ STEP: computed_variable
+   📝 Build a URL from other variables
+   ┌─ 💻 COMMAND: echo "Base URL:    https://api.example.com"
+echo "API Version: v2"
+echo "Full URL:    https://api.example.com/v2/users"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Base URL:    https://api.example.com
+        │ API Version: v2
+        │ Full URL:    https://api.example.com/v2/users
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_template_vars' COMPLETED
+│  └─ ✅ SUBTASK 'show_template_vars' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Variable Precedence (highest to lowest) ==="
+echo "  1. Runtime (--var key=value)"
+echo "  2. Step vars"
+echo "  3. Task vars"
+echo "  4. Definition vars (defaults:)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Variable Precedence (highest to lowest) ===
+        │   1. Runtime (--var key=value)
+        │   2. Step vars
+        │   3. Task vars
+        │   4. Definition vars (defaults:)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## variaule scoping
+
+Variable Scoping
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Variable Scoping
+# OrchStep resolves variables through a 3-level hierarchy:
+#   1. Step vars    -- highest priority (most specific)
+#   2. Task vars    -- mid priority
+#   3. Definition vars (defaults:) -- lowest priority
+#
+# A 4th level -- runtime vars via --var -- overrides everything.
+#
+# Each level can reference variables from lower levels.
+# Step vars are scoped to their step and do not leak to other steps.
+#
+# Try: orchstep run
+# Try: orchstep run --var environment="from-cli"
+
+name: variable-scoping-demo
+desc: "Demonstrates the variable scoping hierarchy"
+
+# Level 3: Definition variables (lowest priority)
+defaults:
+  environment: "staging"
+  app_name: "web-api"
+  runtime: "nodejs18.x"
+
+tasks:
+  main:
+    desc: "Deploy a Lambda function showing variable scoping"
+
+    # Level 2: Task variables (override definition vars)
+    vars:
+      environment: "production"
+      memory_size: "512"
+
+    steps:
+      # Level 1: Step variables (override task and definition vars)
+      - name: package_function
+        desc: "Package the Lambda function code"
+        vars:
+          zip_file: "{{ vars.app_name }}-{{ vars.environment }}.zip"
+        func: shell
+        do: |
+          echo "Creating package: {{ vars.zip_file }}"
+          echo "Environment: {{ vars.environment }}"
+          echo "Runtime: {{ vars.runtime }}"
+          echo "Memory: {{ vars.memory_size }}"
+        outputs:
+          package_path: "{{ vars.zip_file }}"
+
+      # This step does NOT see the zip_file var from the step above.
+      # Step vars are scoped -- they don't leak between steps.
+      - name: create_lambda
+        desc: "Create the Lambda function"
+        func: shell
+        do: |
+          echo "Creating function: {{ vars.app_name }}"
+          echo "Package: {{ steps.package_function.package_path }}"
+          echo "Runtime: {{ vars.runtime }}"
+          echo "Memory: {{ vars.memory_size }}MB"
+
+      # Step vars can also override task vars
+      - name: configure_trigger
+        desc: "Configure API Gateway trigger"
+        vars:
+          api_name: "{{ vars.app_name }}-api"
+          stage: "{{ vars.environment }}"
+        func: shell
+        do: |
+          echo "API Name: {{ vars.api_name }}"
+          echo "Stage: {{ vars.stage }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: variable-scoping-demo
+│ 📋 Demonstrates the variable scoping hierarchy
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Deploy a Lambda function showing variable scoping
+│
+├─ ⚡ STEP: package_function
+│  📝 Package the Lambda function code
+│  ┌─ 💻 COMMAND: echo "Creating package: web-api-production.zip"
+echo "Environment: production"
+echo "Runtime: nodejs18.x"
+echo "Memory: 512"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Creating package: web-api-production.zip
+│       │ Environment: production
+│       │ Runtime: nodejs18.x
+│       │ Memory: 512
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: create_lambda
+│  📝 Create the Lambda function
+│  ┌─ 💻 COMMAND: echo "Creating function: web-api"
+echo "Package: web-api-production.zip"
+echo "Runtime: nodejs18.x"
+echo "Memory: 512MB"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Creating function: web-api
+│       │ Package: web-api-production.zip
+│       │ Runtime: nodejs18.x
+│       │ Memory: 512MB
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: configure_trigger
+   📝 Configure API Gateway trigger
+   ┌─ 💻 COMMAND: echo "API Name: web-api-api"
+echo "Stage: production"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ API Name: web-api-api
+        │ Stage: production
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## vars uetween tasks
+
+Passing Variables Between Tasks
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Passing Variables Between Tasks
+# Tasks can be called from steps using "task:" and receive parameters
+# via "with:". This enables reusable task definitions with configurable inputs.
+#
+# Key concepts:
+#   - "task:" calls a named task
+#   - "with:" passes variables to the called task (overrides its defaults)
+#   - Called tasks define defaults in their own "vars:" section
+#   - The caller's "with:" values take precedence over the task's defaults
+#
+# Try: orchstep run
+
+name: vars-between-tasks-demo
+desc: "Reusable tasks with parameterized inputs"
+
+defaults:
+  organization: "acme-corp"
+
+tasks:
+  # A reusable deployment task with sensible defaults
+  deploy_service:
+    desc: "Deploy a service (reusable task)"
+    vars:
+      service_name: "unnamed-service"
+      environment: "dev"
+      replicas: "1"
+    steps:
+      - name: show_config
+        func: shell
+        do: |
+          echo "=== Deploying {{ vars.service_name }} ==="
+          echo "Org:         {{ vars.organization }}"
+          echo "Environment: {{ vars.environment }}"
+          echo "Replicas:    {{ vars.replicas }}"
+        outputs:
+          deployment_id: "deploy-{{ vars.service_name }}-{{ vars.environment }}"
+          deployed_replicas: "{{ vars.replicas }}"
+
+      - name: execute
+        func: shell
+        do: |
+          echo "kubectl apply -f {{ vars.service_name }}.yml \
+            --replicas={{ vars.replicas }}"
+
+  # A reusable health check task
+  health_check:
+    desc: "Run a health check (reusable task)"
+    vars:
+      service_name: "unknown"
+      endpoint: "localhost:8080"
+    steps:
+      - name: check
+        func: shell
+        do: echo "curl http://{{ vars.endpoint }}/health"
+        outputs:
+          health_status: "healthy"
+
+  # Main task: call the reusable tasks with different parameters
+  main:
+    desc: "Orchestrate deployments across environments"
+    steps:
+      - name: deploy_to_staging
+        desc: "Deploy auth-service to staging"
+        task: deploy_service
+        with:
+          service_name: "auth-service"
+          environment: "staging"
+          replicas: "2"
+
+      - name: deploy_to_production
+        desc: "Deploy auth-service to production"
+        task: deploy_service
+        with:
+          service_name: "auth-service"
+          environment: "production"
+          replicas: "5"
+
+      - name: deploy_worker
+        desc: "Deploy worker to production"
+        task: deploy_service
+        with:
+          service_name: "background-worker"
+          environment: "production"
+          replicas: "8"
+
+      - name: check_auth
+        desc: "Health check the auth service"
+        task: health_check
+        with:
+          service_name: "auth-service"
+          endpoint: "auth.example.com:8080"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Deployment Summary ==="
+          echo "Staging:  {{ steps.deploy_to_staging.deployment_id }} ({{ steps.deploy_to_staging.deployed_replicas }} replicas)"
+          echo "Prod:     {{ steps.deploy_to_production.deployment_id }} ({{ steps.deploy_to_production.deployed_replicas }} replicas)"
+          echo "Worker:   {{ steps.deploy_worker.deployment_id }} ({{ steps.deploy_worker.deployed_replicas }} replicas)"
+          echo "Health:   {{ steps.check_auth.health_status }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: vars-between-tasks-demo
+│ 📋 Reusable tasks with parameterized inputs
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Orchestrate deployments across environments
+│
+├─ ⚡ STEP: deploy_to_staging
+│  📝 Deploy auth-service to staging
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_service
+
+┌─ 🎯 TASK: deploy_service
+│  💡 Deploy a service (reusable task)
+│
+├─ ⚡ STEP: show_config
+│  ┌─ 💻 COMMAND: echo "=== Deploying auth-service ==="
+echo "Org:         acme-corp"
+echo "Environment: staging"
+echo "Replicas:    2"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploying auth-service ===
+│       │ Org:         acme-corp
+│       │ Environment: staging
+│       │ Replicas:    2
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute
+   ┌─ 💻 COMMAND: echo "kubectl apply -f auth-service.yml \
+  --replicas=2"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ kubectl apply -f auth-service.yml   --replicas=2
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_service' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_service' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_to_production
+│  📝 Deploy auth-service to production
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_service
+
+┌─ 🎯 TASK: deploy_service
+│  💡 Deploy a service (reusable task)
+│
+├─ ⚡ STEP: show_config
+│  ┌─ 💻 COMMAND: echo "=== Deploying auth-service ==="
+echo "Org:         acme-corp"
+echo "Environment: production"
+echo "Replicas:    5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploying auth-service ===
+│       │ Org:         acme-corp
+│       │ Environment: production
+│       │ Replicas:    5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute
+   ┌─ 💻 COMMAND: echo "kubectl apply -f auth-service.yml \
+  --replicas=5"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ kubectl apply -f auth-service.yml   --replicas=5
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_service' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_service' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_worker
+│  📝 Deploy worker to production
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_service
+
+┌─ 🎯 TASK: deploy_service
+│  💡 Deploy a service (reusable task)
+│
+├─ ⚡ STEP: show_config
+│  ┌─ 💻 COMMAND: echo "=== Deploying background-worker ==="
+echo "Org:         acme-corp"
+echo "Environment: production"
+echo "Replicas:    8"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploying background-worker ===
+│       │ Org:         acme-corp
+│       │ Environment: production
+│       │ Replicas:    8
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute
+   ┌─ 💻 COMMAND: echo "kubectl apply -f background-worker.yml \
+  --replicas=8"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ kubectl apply -f background-worker.yml   --replicas=8
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_service' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_service' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: check_auth
+│  📝 Health check the auth service
+│  ┌─ 🔄 INVOKING SUBTASK: health_check
+
+┌─ 🎯 TASK: health_check
+│  💡 Run a health check (reusable task)
+│
+└─ ⚡ STEP: check
+   ┌─ 💻 COMMAND: echo "curl http://auth.example.com:8080/health"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ curl http://auth.example.com:8080/health
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'health_check' COMPLETED
+│  └─ ✅ SUBTASK 'health_check' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Deployment Summary ==="
+echo "Staging:  <no value> (<no value> replicas)"
+echo "Prod:     <no value> (<no value> replicas)"
+echo "Worker:   <no value> (<no value> replicas)"
+echo "Health:   <no value>"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Deployment Summary ===
+        │ Staging:  <no value> (<no value> replicas)
+        │ Prod:     <no value> (<no value> replicas)
+        │ Worker:   <no value> (<no value> replicas)
+        │ Health:   <no value>
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

@@ -1,0 +1,631 @@
+---
+title: "Git Operations Examples"
+description: "OrchStep examples for git clone, checkout, and repository operations"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## authenticated git
+
+Authenticated Git Operations
+
+```yaml
+# Example: Authenticated Git Operations
+# Shows how to clone private repositories using tokens and
+# SSH keys for authentication.
+#
+# Authentication methods:
+#   Token auth:  auth: { type: token, token: "ghp_..." }
+#   SSH:         Use SSH URLs (git@github.com:org/repo.git)
+#
+# IMPORTANT: Never hardcode tokens in workflow files.
+# Use --var flags or environment variables instead.
+#
+# Try: orchstep run clone-private-repo --var github_token=ghp_your_token
+# Try: orchstep run ssh-clone
+
+name: authenticated-git-demo
+desc: "Clone private repositories with token or SSH auth"
+
+defaults:
+  work_dir: "/tmp/orchstep-auth-git"
+
+tasks:
+  # -- Clone with HTTPS token --
+  clone-private-repo:
+    desc: "Clone a private repository using a GitHub token"
+    vars:
+      # Pass token at runtime: --var github_token=ghp_xxxx
+      github_token: "{{ env.GITHUB_TOKEN }}"
+      repo_url: "https://github.com/your-org/private-repo.git"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}/private
+          mkdir -p {{ vars.work_dir }}
+
+      - name: clone_with_token
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.work_dir }}/private"
+          depth: 1
+          auth:
+            type: "token"
+            token: "{{ vars.github_token }}"
+        outputs:
+          success: "{{ result.success }}"
+          url: "{{ result.url }}"
+
+      - name: verify_clone
+        func: shell
+        do: |
+          if [ -d "{{ vars.work_dir }}/private/.git" ]; then
+            echo "Repository cloned successfully"
+            cd {{ vars.work_dir }}/private
+            echo "Current commit: $(git rev-parse --short HEAD)"
+          else
+            echo "Clone failed"
+            exit 1
+          fi
+
+      # Verify no token leakage in git config
+      - name: verify_security
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/private
+          remote_url=$(git remote get-url origin)
+          # Ensure the token is not embedded in the remote URL
+          if echo "$remote_url" | grep -q "ghp_"; then
+            echo "WARNING: Token found in remote URL"
+          else
+            echo "Remote URL is clean (no embedded tokens)"
+          fi
+
+  # -- Clone using SSH key --
+  ssh-clone:
+    desc: "Clone a repository using SSH authentication"
+    vars:
+      ssh_repo: "git@github.com:your-org/private-repo.git"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}/ssh-repo
+          mkdir -p {{ vars.work_dir }}
+
+      - name: verify_ssh_agent
+        func: shell
+        do: |
+          echo "Checking SSH agent..."
+          if ssh-add -l 2>/dev/null; then
+            echo "SSH keys loaded"
+          else
+            echo "No SSH keys found. Add keys with: ssh-add ~/.ssh/id_ed25519"
+          fi
+
+      - name: clone_via_ssh
+        func: shell
+        do: |
+          echo "Cloning via SSH..."
+          git clone --depth 1 {{ vars.ssh_repo }} {{ vars.work_dir }}/ssh-repo
+          echo "Clone complete"
+        on_error: warn
+
+  # -- Token from environment variable --
+  env-token-clone:
+    desc: "Use environment variable for the token (recommended)"
+    vars:
+      repo_url: "https://github.com/your-org/private-repo.git"
+    steps:
+      - name: check_token
+        func: shell
+        do: |
+          if [ -n "${GITHUB_TOKEN}" ]; then
+            echo "GITHUB_TOKEN is set (length: ${#GITHUB_TOKEN} chars)"
+          else
+            echo "GITHUB_TOKEN not found in environment"
+            echo "Set it with: export GITHUB_TOKEN=ghp_your_token"
+            exit 1
+          fi
+
+      - name: clone_with_env_token
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.work_dir }}/env-token"
+          depth: 1
+          auth:
+            type: "token"
+            token: "{{ env.GITHUB_TOKEN }}"
+        outputs:
+          success: "{{ result.success }}"
+
+  # -- Cleanup --
+  cleanup:
+    desc: "Remove all cloned repositories"
+    steps:
+      - name: remove
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          echo "Cleanup complete"
+```
+
+---
+
+## checkout operations
+
+Git Checkout Operations
+
+```yaml
+# Example: Git Checkout Operations
+# Shows how to checkout branches, tags, and specific commits
+# using the built-in git function.
+#
+# Common use cases:
+#   - Switch branches for multi-branch CI builds
+#   - Checkout a release tag for deployment
+#   - Inspect a specific commit for debugging
+#
+# Try: orchstep run checkout-workflow
+
+name: git-checkout-demo
+desc: "Checkout branches, tags, and commits"
+
+defaults:
+  repo_url: "https://github.com/orchstep/example-repo.git"
+  work_dir: "/tmp/orchstep-checkout-demo"
+
+tasks:
+  # -- Complete checkout workflow --
+  checkout-workflow:
+    desc: "Clone and perform various checkout operations"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          mkdir -p {{ vars.work_dir }}
+
+      # Clone with some history so we can checkout
+      - name: clone_repo
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.work_dir }}/repo"
+          depth: 10    # Need some history for checkout operations
+        outputs:
+          repo_path: "{{ result.dest }}"
+          clone_success: "{{ result.success }}"
+
+      # Inspect what we have to work with
+      - name: explore_repo
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "=== Repository State ==="
+          echo "Current branch:"
+          git branch
+          echo ""
+          echo "Available commits:"
+          git log --oneline -5
+          echo ""
+          echo "Current HEAD:"
+          git rev-parse HEAD
+
+      # Checkout a previous commit (detached HEAD)
+      - name: checkout_previous
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          CURRENT=$(git rev-parse HEAD)
+          echo "Current SHA: $CURRENT"
+
+          # Try checking out the previous commit
+          git checkout HEAD~1 2>/dev/null && echo "Checked out previous commit" || echo "Only one commit in shallow clone"
+          echo "Now at: $(git rev-parse HEAD)"
+
+          # Return to original branch
+          git checkout - 2>/dev/null || git checkout main 2>/dev/null || true
+
+      - name: summary
+        func: shell
+        do: echo "Checkout operations completed"
+
+  # -- Branch-based CI build --
+  build-for-branch:
+    desc: "Clone a specific branch and build"
+    vars:
+      branch: "main"
+    steps:
+      - name: setup
+        func: shell
+        do: rm -rf {{ vars.work_dir }}/branch-build
+
+      - name: clone_branch
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.work_dir }}/branch-build"
+          branch: "{{ vars.branch }}"
+          depth: 1
+        outputs:
+          success: "{{ result.success }}"
+
+      - name: build
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/branch-build
+          echo "Building from branch: {{ vars.branch }}"
+          echo "Commit: $(git rev-parse --short HEAD)"
+          # In real usage: make build, npm run build, etc.
+          echo "Build complete"
+
+  # -- Tag-based release deployment --
+  deploy-release-tag:
+    desc: "Checkout a release tag and deploy"
+    vars:
+      release_tag: "v1.0.0"
+    steps:
+      - name: setup
+        func: shell
+        do: rm -rf {{ vars.work_dir }}/release
+
+      - name: clone_at_tag
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.work_dir }}/release"
+          branch: "{{ vars.release_tag }}"
+          depth: 1
+        outputs:
+          success: "{{ result.success }}"
+
+      - name: deploy
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/release
+          echo "Deploying release {{ vars.release_tag }}"
+          echo "Commit: $(git rev-parse --short HEAD)"
+          # In real usage: docker build, helm upgrade, etc.
+          echo "Deployment complete"
+
+  # -- Cleanup --
+  cleanup:
+    desc: "Remove working directory"
+    steps:
+      - name: remove
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          echo "Cleanup complete"
+```
+
+---
+
+## clone patterns
+
+Git Clone Patterns
+
+```yaml
+# Example: Git Clone Patterns
+# Shows how to clone repositories using the built-in git function
+# with various options: branches, tags, shallow clones, submodules.
+#
+# The git function uses:
+#   func: git
+#   args:
+#     operation: clone
+#     url: "https://github.com/org/repo.git"
+#     dest: "./local-path"
+#
+# Result outputs: result.dest, result.success, result.url
+#
+# Try: orchstep run shallow-clone
+# Try: orchstep run clone-with-retry
+
+name: git-clone-patterns-demo
+desc: "Clone repositories with branches, tags, and options"
+
+defaults:
+  repo_url: "https://github.com/orchstep/example-repo.git"
+  clone_dir: "/tmp/orchstep-clone-demo"
+
+tasks:
+  # -- Shallow clone (fastest, most common) --
+  shallow-clone:
+    desc: "Clone only the latest commit for fast checkout"
+    steps:
+      - name: prepare
+        func: shell
+        do: |
+          rm -rf {{ vars.clone_dir }}/shallow
+          mkdir -p {{ vars.clone_dir }}
+
+      - name: clone_repo
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.clone_dir }}/shallow"
+          depth: 1                # Only the latest commit
+        outputs:
+          path: "{{ result.dest }}"
+          success: "{{ result.success }}"
+
+      - name: verify
+        func: shell
+        do: |
+          echo "Cloned to: {{ steps.clone_repo.path }}"
+          echo "Success: {{ steps.clone_repo.success }}"
+
+  # -- Clone a specific branch --
+  clone-branch:
+    desc: "Clone a specific branch"
+    steps:
+      - name: prepare
+        func: shell
+        do: rm -rf {{ vars.clone_dir }}/feature-branch
+
+      - name: clone_feature_branch
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.clone_dir }}/feature-branch"
+          branch: "develop"       # Clone a specific branch
+          depth: 1
+        outputs:
+          success: "{{ result.success }}"
+
+  # -- Clone at a specific tag --
+  clone-tag:
+    desc: "Clone at a release tag for reproducible builds"
+    vars:
+      release_tag: "v1.0.0"
+    steps:
+      - name: prepare
+        func: shell
+        do: rm -rf {{ vars.clone_dir }}/release
+
+      - name: clone_release
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.clone_dir }}/release"
+          branch: "{{ vars.release_tag }}"
+          depth: 1
+        outputs:
+          success: "{{ result.success }}"
+
+      - name: show_tag
+        func: shell
+        do: |
+          echo "Cloned release {{ vars.release_tag }}"
+
+  # -- Full clone with history --
+  full-clone:
+    desc: "Clone with complete history (for analysis or bisect)"
+    steps:
+      - name: prepare
+        func: shell
+        do: rm -rf {{ vars.clone_dir }}/full
+
+      - name: clone_full_history
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.clone_dir }}/full"
+          # Omit depth for full history
+        outputs:
+          success: "{{ result.success }}"
+
+  # -- Clone with submodules --
+  clone-with-submodules:
+    desc: "Clone and initialize submodules recursively"
+    steps:
+      - name: prepare
+        func: shell
+        do: rm -rf {{ vars.clone_dir }}/with-submodules
+
+      - name: clone_recursive
+        func: shell
+        do: |
+          git clone --depth 1 --single-branch --recursive \
+            {{ vars.repo_url }} \
+            {{ vars.clone_dir }}/with-submodules
+          echo "Cloned with submodules"
+
+  # -- Clone with retry for flaky networks --
+  clone-with-retry:
+    desc: "Retry clone on network failures"
+    steps:
+      - name: prepare
+        func: shell
+        do: rm -rf {{ vars.clone_dir }}/retry
+
+      - name: resilient_clone
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.clone_dir }}/retry"
+          depth: 1
+        retry:
+          max_attempts: 5
+          interval: 2s
+          backoff_rate: 1.5
+          when: "result.exit_code != 0"
+        outputs:
+          success: "{{ result.success }}"
+
+  # -- Cleanup --
+  cleanup:
+    desc: "Remove all cloned repositories"
+    steps:
+      - name: remove_all
+        func: shell
+        do: |
+          rm -rf {{ vars.clone_dir }}
+          echo "Cleanup complete"
+```
+
+---
+
+## repository info
+
+Repository Information
+
+```yaml
+# Example: Repository Information
+# Shows how to query git repository information: fetch updates,
+# list branches and tags, and retrieve commit details.
+#
+# These operations are useful in CI/CD pipelines to determine
+# what to build, tag, or deploy based on repository state.
+#
+# Try: orchstep run get-repo-info
+# Try: orchstep run list-releases
+
+name: repository-info-demo
+desc: "Fetch, list branches/tags, and get commit info"
+
+defaults:
+  repo_url: "https://github.com/orchstep/example-repo.git"
+  work_dir: "/tmp/orchstep-repo-info"
+
+tasks:
+  # -- Fetch and inspect a repository --
+  get-repo-info:
+    desc: "Clone, fetch, and display repository information"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          mkdir -p {{ vars.work_dir }}
+
+      - name: clone_repo
+        func: git
+        args:
+          operation: clone
+          url: "{{ vars.repo_url }}"
+          dest: "{{ vars.work_dir }}/repo"
+          depth: 10
+        outputs:
+          repo_path: "{{ result.dest }}"
+
+      - name: get_current_commit
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "SHA: $(git rev-parse HEAD)"
+          echo "Short SHA: $(git rev-parse --short HEAD)"
+          echo "Author: $(git log -1 --format='%an')"
+          echo "Date: $(git log -1 --format='%ci')"
+          echo "Message: $(git log -1 --format='%s')"
+
+      - name: list_recent_commits
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "=== Recent Commits ==="
+          git log --oneline -5
+
+  # -- List branches --
+  list-branches:
+    desc: "List all branches in the repository"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          git clone {{ vars.repo_url }} {{ vars.work_dir }}/repo 2>/dev/null
+
+      - name: show_branches
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "=== Local Branches ==="
+          git branch
+          echo ""
+          echo "=== All Branches (including remote) ==="
+          git branch --all
+
+  # -- List tags and filter releases --
+  list-releases:
+    desc: "List tags and filter for release versions"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          git clone {{ vars.repo_url }} {{ vars.work_dir }}/repo 2>/dev/null
+
+      - name: list_all_tags
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "=== All Tags ==="
+          git tag --list
+        outputs:
+          tags: "{{ result.output }}"
+
+      - name: list_version_tags
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "=== Version Tags (v*) ==="
+          git tag --list "v*"
+        outputs:
+          versions: "{{ result.output }}"
+
+      - name: get_latest_tag
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "no tags")
+          echo "Latest tag: $LATEST"
+
+  # -- Fetch with prune --
+  fetch-updates:
+    desc: "Fetch latest changes and prune stale remote refs"
+    steps:
+      - name: setup
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          git clone {{ vars.repo_url }} {{ vars.work_dir }}/repo 2>/dev/null
+
+      - name: fetch_and_prune
+        func: shell
+        do: |
+          cd {{ vars.work_dir }}/repo
+          echo "Fetching latest changes..."
+          git fetch --prune origin
+          echo "Fetch complete"
+          echo ""
+          echo "Remote branches:"
+          git branch -r
+
+  # -- Cleanup --
+  cleanup:
+    desc: "Remove working directory"
+    steps:
+      - name: remove
+        func: shell
+        do: |
+          rm -rf {{ vars.work_dir }}
+          echo "Cleanup complete"
+```

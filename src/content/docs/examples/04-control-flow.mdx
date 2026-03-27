@@ -1,0 +1,780 @@
+---
+title: "Control Flow Examples"
+description: "OrchStep examples for conditionals, switch/case, and task calling"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## if elif else
+
+If / Elif / Else Chains
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: If / Elif / Else Chains
+# For multi-branch decisions, use "elif:" to test additional conditions
+# in sequence. The first matching branch wins.
+#
+# Key concepts:
+#   - "if:" tests the first condition
+#   - "elif:" is a list of additional conditions, tested in order
+#   - "else:" runs if nothing above matched
+#   - Supports both Go template and JavaScript expressions
+#   - Outputs from the matched branch are available via the parent step
+#
+# Try: orchstep run
+# Try: orchstep run --var score=95
+
+name: if-elif-else-demo
+desc: "Multi-branch conditional execution"
+
+defaults:
+  score: 85
+
+tasks:
+  main:
+    desc: "Grade a score using if/elif/else"
+    steps:
+      # Multi-branch grading with Go template expressions
+      - name: assign_grade
+        if: '{{ gt vars.score 90 }}'
+        task: grade_a
+        elif:
+          - if: '{{ gt vars.score 80 }}'
+            task: grade_b
+          - if: '{{ gt vars.score 70 }}'
+            task: grade_c
+          - if: '{{ gt vars.score 60 }}'
+            task: grade_d
+        else:
+          task: grade_f
+        outputs:
+          final_grade: '{{ steps.result.grade }}'
+
+      # JavaScript expressions in elif chains
+      - name: classify_score
+        if: 'vars.score === 100'
+        task: perfect
+        elif:
+          - if: 'vars.score >= 90'
+            task: excellent
+          - if: 'vars.score >= 75'
+            task: good
+          - if: 'vars.score >= 60'
+            task: passing
+        else:
+          task: needs_improvement
+
+      - name: report
+        func: shell
+        do: |
+          echo "=== Score Report ==="
+          echo "Score: {{ vars.score }}"
+          echo "Grade: {{ steps.assign_grade.final_grade }}"
+
+  grade_a:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Grade A -- Excellent work!"
+        outputs:
+          grade: "A"
+
+  grade_b:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Grade B -- Good job!"
+        outputs:
+          grade: "B"
+
+  grade_c:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Grade C -- Satisfactory"
+        outputs:
+          grade: "C"
+
+  grade_d:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Grade D -- Needs improvement"
+        outputs:
+          grade: "D"
+
+  grade_f:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Grade F -- Did not pass"
+        outputs:
+          grade: "F"
+
+  perfect:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Perfect score!"
+
+  excellent:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Excellent!"
+
+  good:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Good"
+
+  passing:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Passing"
+
+  needs_improvement:
+    steps:
+      - name: result
+        func: shell
+        do: echo "Needs improvement"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: if-elif-else-demo
+│ 📋 Multi-branch conditional execution
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Grade a score using if/elif/else
+│
+├─ ⚡ STEP: assign_grade
+
+┌─ 🎯 TASK: grade_b
+│
+└─ ⚡ STEP: result
+   ┌─ 💻 COMMAND: echo "Grade B -- Good job!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Grade B -- Good job!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'grade_b' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: classify_score
+
+┌─ 🎯 TASK: good
+│
+└─ ⚡ STEP: result
+   ┌─ 💻 COMMAND: echo "Good"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Good
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'good' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: report
+   ┌─ 💻 COMMAND: echo "=== Score Report ==="
+echo "Score: 85"
+echo "Grade: B"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Score Report ===
+        │ Score: 85
+        │ Grade: B
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## if else uasic
+
+Basic If/Else
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Basic If/Else
+# OrchStep supports conditional step execution using if/else.
+# Conditions can use Go template expressions or JavaScript expressions.
+#
+# Key concepts:
+#   - "if:" evaluates a condition (Go template or JavaScript)
+#   - When true: runs the step's task/func/then
+#   - When false: runs the "else:" branch (task or inline steps)
+#   - If false with no else: the step is silently skipped
+#
+# Try: orchstep run
+# Try: orchstep run --var environment="staging"
+# Try: orchstep run --var deploy_enabled=false
+
+name: if-else-basic-demo
+desc: "Conditional execution with if/else"
+
+defaults:
+  deploy_enabled: true
+  environment: "production"
+  threshold: 42
+
+tasks:
+  main:
+    desc: "Show different if/else patterns"
+    steps:
+      # Pattern 1: if true -> run task
+      - name: check_deploy_flag
+        if: '{{ vars.deploy_enabled }}'
+        task: do_deploy
+
+      # Pattern 2: if/else with task references
+      - name: select_environment
+        if: '{{ eq vars.environment "staging" }}'
+        task: deploy_staging
+        else: deploy_production
+
+      # Pattern 3: if with Go template comparison
+      - name: check_threshold
+        if: '{{ gt vars.threshold 50 }}'
+        task: threshold_high
+        else: threshold_low
+
+      # Pattern 4: if with JavaScript expression
+      - name: check_range
+        if: 'vars.threshold >= 40 && vars.threshold < 50'
+        task: in_range
+
+      # Pattern 5: if false with no else (step is skipped)
+      - name: dev_only_debug
+        if: '{{ eq vars.environment "development" }}'
+        task: debug_info
+
+      - name: finish
+        func: shell
+        do: echo "Workflow completed"
+
+  do_deploy:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Deployment is enabled -- proceeding"
+
+  deploy_staging:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Deploying to STAGING environment"
+
+  deploy_production:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Deploying to PRODUCTION environment"
+
+  threshold_high:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Threshold is high (> 50)"
+
+  threshold_low:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Threshold is low (<= 50)"
+
+  in_range:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Value is in range [40, 50)"
+
+  debug_info:
+    steps:
+      - name: run
+        func: shell
+        do: echo "Debug info (only in development)"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: if-else-basic-demo
+│ 📋 Conditional execution with if/else
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Show different if/else patterns
+│
+├─ ⚡ STEP: check_deploy_flag
+
+┌─ 🎯 TASK: do_deploy
+│
+└─ ⚡ STEP: run
+   ┌─ 💻 COMMAND: echo "Deployment is enabled -- proceeding"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deployment is enabled -- proceeding
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'do_deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: select_environment
+
+┌─ 🎯 TASK: deploy_production
+│
+└─ ⚡ STEP: run
+   ┌─ 💻 COMMAND: echo "Deploying to PRODUCTION environment"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to PRODUCTION environment
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_production' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: check_threshold
+
+┌─ 🎯 TASK: threshold_low
+│
+└─ ⚡ STEP: run
+   ┌─ 💻 COMMAND: echo "Threshold is low (<= 50)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Threshold is low (<= 50)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'threshold_low' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: check_range
+
+┌─ 🎯 TASK: in_range
+│
+└─ ⚡ STEP: run
+   ┌─ 💻 COMMAND: echo "Value is in range [40, 50)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Value is in range [40, 50)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'in_range' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: dev_only_debug
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: finish
+   ┌─ 💻 COMMAND: echo "Workflow completed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Workflow completed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## switch case
+
+Switch / Case
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Switch / Case
+# For matching a single value against multiple options, use switch/case.
+# This is cleaner than long if/elif chains when comparing one variable.
+#
+# Key concepts:
+#   - "switch: value:" the expression to match against
+#   - "cases:" a list of when/then pairs
+#   - "when:" can be a single value or a list of values
+#   - "default:" runs if no case matches
+#   - Each case's "then:" contains a list of steps to execute
+#
+# Try: orchstep run
+# Try: orchstep run --var environment="production"
+# Try: orchstep run --var user_role="viewer"
+
+name: switch-case-demo
+desc: "Pattern matching with switch/case"
+
+defaults:
+  environment: "staging"
+  user_role: "admin"
+
+tasks:
+  main:
+    desc: "Configure based on environment and role"
+    steps:
+      # Match environment to set configuration
+      - name: env_config
+        switch:
+          value: '{{ vars.environment }}'
+          cases:
+            - when: production
+              then:
+                - name: prod_settings
+                  func: shell
+                  do: |
+                    echo "Environment: Production"
+                    echo "LOG_LEVEL=error"
+                    echo "REPLICAS=5"
+                  outputs:
+                    log_level: "error"
+                    replicas: "5"
+
+            - when: staging
+              then:
+                - name: staging_settings
+                  func: shell
+                  do: |
+                    echo "Environment: Staging"
+                    echo "LOG_LEVEL=warn"
+                    echo "REPLICAS=2"
+                  outputs:
+                    log_level: "warn"
+                    replicas: "2"
+
+            # "when" can match multiple values
+            - when: [development, dev]
+              then:
+                - name: dev_settings
+                  func: shell
+                  do: |
+                    echo "Environment: Development"
+                    echo "LOG_LEVEL=debug"
+                    echo "REPLICAS=1"
+                  outputs:
+                    log_level: "debug"
+                    replicas: "1"
+
+          default:
+            - name: unknown_env
+              func: shell
+              do: echo "Unknown environment -- using defaults"
+              outputs:
+                log_level: "info"
+                replicas: "1"
+
+      # Match user role to determine permissions
+      - name: permissions
+        switch:
+          value: '{{ vars.user_role }}'
+          cases:
+            - when: admin
+              then:
+                - name: admin_perms
+                  func: shell
+                  do: 'echo "Permissions: full access (create, read, update, delete)"'
+                  outputs:
+                    access_level: "full"
+
+            - when: [editor, moderator]
+              then:
+                - name: editor_perms
+                  func: shell
+                  do: 'echo "Permissions: edit access (create, read, update)"'
+                  outputs:
+                    access_level: "edit"
+
+            - when: viewer
+              then:
+                - name: viewer_perms
+                  func: shell
+                  do: 'echo "Permissions: read-only"'
+                  outputs:
+                    access_level: "read"
+
+          default:
+            - name: guest_perms
+              func: shell
+              do: 'echo "Permissions: no access"'
+              outputs:
+                access_level: "none"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Configuration Summary ==="
+          echo "Environment: {{ vars.environment }}"
+          echo "User Role:   {{ vars.user_role }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: switch-case-demo
+│ 📋 Pattern matching with switch/case
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Configure based on environment and role
+│
+├─ ⚡ STEP: env_config
+│  ┌─ 💻 COMMAND: echo "Environment: Staging"
+echo "LOG_LEVEL=warn"
+echo "REPLICAS=2"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Environment: Staging
+│       │ LOG_LEVEL=warn
+│       │ REPLICAS=2
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: permissions
+│  ┌─ 💻 COMMAND: echo "Permissions: full access (create, read, update, delete)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Permissions: full access (create, read, update, delete)
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Configuration Summary ==="
+echo "Environment: staging"
+echo "User Role:   admin"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Configuration Summary ===
+        │ Environment: staging
+        │ User Role:   admin
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## task calling
+
+Task Calling and File Discovery
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Task Calling and File Discovery
+# OrchStep automatically discovers task files from a tasks/ directory.
+# This lets you organize large workflows into separate files.
+#
+# Key concepts:
+#   - Tasks defined in tasks/<name>.yml are auto-discovered
+#   - Nested directories work: tasks/deploy/staging.yml -> task "deploy-staging"
+#   - The main orchstep.yml can call discovered tasks by name
+#   - Inline tasks and file-based tasks can be mixed freely
+#
+# Directory structure for this example:
+#   orchstep.yml          <-- this file
+#   tasks/
+#     build.yml           <-- auto-discovered as "build"
+#     test.yml            <-- auto-discovered as "test"
+#     deploy/
+#       staging.yml       <-- auto-discovered as "deploy-staging"
+#       production.yml    <-- auto-discovered as "deploy-production"
+#
+# Try: orchstep run
+
+name: task-calling-demo
+desc: "Orchestrate auto-discovered task files"
+
+tasks:
+  # Inline task: call out to file-based tasks in sequence
+  main:
+    desc: "CI/CD pipeline using auto-discovered tasks"
+    steps:
+      - name: run_build
+        desc: "Execute the build task (from tasks/build.yml)"
+        task: build
+
+      - name: run_tests
+        desc: "Execute the test task (from tasks/test.yml)"
+        task: test
+
+      - name: deploy_staging
+        desc: "Deploy to staging (from tasks/deploy/staging.yml)"
+        task: deploy-staging
+
+      - name: deploy_production
+        desc: "Deploy to production (from tasks/deploy/production.yml)"
+        task: deploy-production
+
+      - name: done
+        func: shell
+        do: echo "Pipeline complete -- all tasks executed."
+
+  # You can also define tasks inline alongside discovered ones
+  notify:
+    desc: "Send notification (inline task)"
+    steps:
+      - name: send
+        func: shell
+        do: echo "Sending deployment notification..."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📂 Discovered 4 task file(s) from tasks/ directory
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: task-calling-demo
+│ 📋 Orchestrate auto-discovered task files
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 CI/CD pipeline using auto-discovered tasks
+│
+├─ ⚡ STEP: run_build
+│  📝 Execute the build task (from tasks/build.yml)
+│  ┌─ 🔄 INVOKING SUBTASK: build
+
+┌─ 🎯 TASK: build
+│  💡 Build the application
+│
+├─ ⚡ STEP: compile
+│  ┌─ 💻 COMMAND: echo "Compiling application..."
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Compiling application...
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: package
+   ┌─ 💻 COMMAND: echo "Packaging build artifacts..."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Packaging build artifacts...
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'build' COMPLETED
+│  └─ ✅ SUBTASK 'build' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_tests
+│  📝 Execute the test task (from tasks/test.yml)
+│  ┌─ 🔄 INVOKING SUBTASK: test
+
+┌─ 🎯 TASK: test
+│  💡 Run tests
+│
+├─ ⚡ STEP: unit_tests
+│  ┌─ 💻 COMMAND: echo "Running unit tests... PASSED"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Running unit tests... PASSED
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: integration_tests
+   ┌─ 💻 COMMAND: echo "Running integration tests... PASSED"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Running integration tests... PASSED
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'test' COMPLETED
+│  └─ ✅ SUBTASK 'test' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_staging
+│  📝 Deploy to staging (from tasks/deploy/staging.yml)
+│  ┌─ 🔄 INVOKING SUBTASK: deploy-staging
+
+┌─ 🎯 TASK: deploy-staging
+│  💡 Deploy to staging environment
+│
+├─ ⚡ STEP: deploy
+│  ┌─ 💻 COMMAND: echo "Deploying to staging environment..."
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying to staging environment...
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: verify
+   ┌─ 💻 COMMAND: echo "Staging deployment verified."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Staging deployment verified.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy-staging' COMPLETED
+│  └─ ✅ SUBTASK 'deploy-staging' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_production
+│  📝 Deploy to production (from tasks/deploy/production.yml)
+│  ┌─ 🔄 INVOKING SUBTASK: deploy-production
+
+┌─ 🎯 TASK: deploy-production
+│  💡 Deploy to production environment
+│
+├─ ⚡ STEP: deploy
+│  ┌─ 💻 COMMAND: echo "Deploying to production environment..."
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying to production environment...
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: verify
+   ┌─ 💻 COMMAND: echo "Production deployment verified."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Production deployment verified.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy-production' COMPLETED
+│  └─ ✅ SUBTASK 'deploy-production' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: done
+   ┌─ 💻 COMMAND: echo "Pipeline complete -- all tasks executed."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Pipeline complete -- all tasks executed.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

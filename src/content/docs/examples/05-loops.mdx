@@ -1,0 +1,820 @@
+---
+title: "Loops Examples"
+description: "OrchStep examples for loops, iteration, and loop-until patterns"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## uasic loop
+
+Basic Loop Iteration
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Basic Loop Iteration
+# OrchStep supports looping over lists, counts, and ranges.
+# Each iteration has access to loop metadata like index and position.
+#
+# Key concepts:
+#   - "loop:" accepts a list variable, a count, or a range
+#   - {{ loop.item }}   -- current item value
+#   - {{ loop.index }}  -- zero-based index (0, 1, 2, ...)
+#   - {{ loop.index1 }} -- one-based index (1, 2, 3, ...)
+#   - {{ loop.first }}  -- true on the first iteration
+#   - {{ loop.last }}   -- true on the last iteration
+#   - {{ loop.length }} -- total number of items
+#   - "as:" renames loop.item to a custom name
+#   - Loop outputs are collected into an array
+#
+# Try: orchstep run
+
+name: basic-loop-demo
+desc: "Iterate over lists, counts, and ranges"
+
+defaults:
+  servers:
+    - "web-01.example.com"
+    - "web-02.example.com"
+    - "web-03.example.com"
+
+tasks:
+  main:
+    desc: "Demonstrate loop patterns"
+    steps:
+      # Pattern 1: Loop over a list variable
+      - name: check_servers
+        desc: "Health-check each server"
+        loop: "{{ vars.servers }}"
+        func: shell
+        do: |
+          echo "Checking server {{ loop.index1 }}/{{ loop.length }}: {{ loop.item }}"
+          echo "  First: {{ loop.first }}, Last: {{ loop.last }}"
+        outputs:
+          server: "{{ loop.item }}"
+          position: "{{ loop.index1 }}"
+
+      # Pattern 2: Loop a fixed number of times
+      - name: retry_attempts
+        desc: "Simulate 5 retry attempts"
+        loop: 5
+        func: shell
+        do: echo "Attempt {{ loop.item }} of {{ loop.length }}"
+        outputs:
+          attempt: "{{ loop.item }}"
+
+      # Pattern 3: Loop over a numeric range
+      - name: port_scan
+        desc: "Check ports 8080-8084"
+        loop:
+          range: [8080, 8084]
+          as: port
+        func: shell
+        do: echo "Scanning port {{ loop.port }}"
+        outputs:
+          port: "{{ loop.port }}"
+
+      # Pattern 4: Loop with a custom variable name
+      - name: deploy_servers
+        desc: "Deploy to each server using a named loop variable"
+        loop:
+          items: "{{ vars.servers }}"
+          as: hostname
+        func: shell
+        do: |
+          echo "Deploying to {{ loop.hostname }} ({{ loop.index1 }}/{{ loop.length }})"
+        outputs:
+          hostname: "{{ loop.hostname }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: basic-loop-demo
+│ 📋 Iterate over lists, counts, and ranges
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Demonstrate loop patterns
+│
+├─ ⚡ STEP: check_servers
+│  📝 Health-check each server
+   ↻ Starting loop with 3 iterations for step 'check_servers'
+     ↻ Iteration 1/3
+│  ┌─ 💻 COMMAND: echo "Checking server 1/3: web-01.example.com"
+echo "  First: true, Last: false"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Checking server 1/3: web-01.example.com
+│       │   First: true, Last: false
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/3
+│  ┌─ 💻 COMMAND: echo "Checking server 2/3: web-02.example.com"
+echo "  First: false, Last: false"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Checking server 2/3: web-02.example.com
+│       │   First: false, Last: false
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 3/3
+│  ┌─ 💻 COMMAND: echo "Checking server 3/3: web-03.example.com"
+echo "  First: false, Last: true"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Checking server 3/3: web-03.example.com
+│       │   First: false, Last: true
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 3 iterations
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: retry_attempts
+│  📝 Simulate 5 retry attempts
+   ↻ Starting loop with 5 iterations for step 'retry_attempts'
+     ↻ Iteration 1/5
+│  ┌─ 💻 COMMAND: echo "Attempt 1 of 5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Attempt 1 of 5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/5
+│  ┌─ 💻 COMMAND: echo "Attempt 2 of 5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Attempt 2 of 5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 3/5
+│  ┌─ 💻 COMMAND: echo "Attempt 3 of 5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Attempt 3 of 5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/5
+│  ┌─ 💻 COMMAND: echo "Attempt 4 of 5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Attempt 4 of 5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 5/5
+│  ┌─ 💻 COMMAND: echo "Attempt 5 of 5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Attempt 5 of 5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 5 iterations
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: port_scan
+│  📝 Check ports 8080-8084
+   ↻ Starting loop with 5 iterations for step 'port_scan'
+     ↻ Iteration 1/5
+│  ┌─ 💻 COMMAND: echo "Scanning port 8080"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Scanning port 8080
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/5
+│  ┌─ 💻 COMMAND: echo "Scanning port 8081"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Scanning port 8081
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 3/5
+│  ┌─ 💻 COMMAND: echo "Scanning port 8082"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Scanning port 8082
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/5
+│  ┌─ 💻 COMMAND: echo "Scanning port 8083"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Scanning port 8083
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 5/5
+│  ┌─ 💻 COMMAND: echo "Scanning port 8084"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Scanning port 8084
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 5 iterations
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: deploy_servers
+   📝 Deploy to each server using a named loop variable
+   ↻ Starting loop with 3 iterations for step 'deploy_servers'
+     ↻ Iteration 1/3
+   ┌─ 💻 COMMAND: echo "Deploying to web-01.example.com (1/3)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to web-01.example.com (1/3)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/3
+   ┌─ 💻 COMMAND: echo "Deploying to web-02.example.com (2/3)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to web-02.example.com (2/3)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 3/3
+   ┌─ 💻 COMMAND: echo "Deploying to web-03.example.com (3/3)"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to web-03.example.com (3/3)
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 3 iterations
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## loop until
+
+Loop Until
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Loop Until
+# The "until:" keyword breaks the loop when a condition becomes true.
+# This is useful for polling, retrying, or searching through items.
+#
+# Key concepts:
+#   - "until:" evaluates after each iteration
+#   - When the until condition is true, the loop stops
+#   - Supports Go template expressions: '{{ eq .loop.iteration 5 }}'
+#   - Supports JavaScript expressions: 'loop.iteration === 5'
+#   - Can reference step outputs for status-based breaking
+#   - "delay:" adds a pause between iterations (useful for polling)
+#
+# Try: orchstep run find_target
+# Try: orchstep run retry_until_ready
+# Try: orchstep run search_items
+
+name: loop-until-demo
+desc: "Break loops with until conditions"
+
+defaults:
+  target_number: 5
+  search_items:
+    - name: "item-a"
+      valid: false
+    - name: "item-b"
+      valid: false
+    - name: "item-c"
+      valid: true
+    - name: "item-d"
+      valid: false
+
+tasks:
+  # Count-based loop that stops at a target
+  find_target:
+    desc: "Loop until we reach the target number"
+    steps:
+      - name: count_to_target
+        loop:
+          count: 20
+          until: '{{ eq .loop.iteration .vars.target_number }}'
+        func: shell
+        do: |
+          echo "Checking: {{ loop.iteration }}"
+        outputs:
+          checked: "{{ loop.iteration }}"
+
+  # Retry pattern with delay
+  retry_until_ready:
+    desc: "Poll a service until it becomes ready"
+    steps:
+      - name: wait_for_ready
+        loop:
+          count: 10
+          until: '{{ eq .steps.wait_for_ready.status "ready" }}'
+          delay: "100ms"
+        func: shell
+        do: |
+          echo "Attempt {{ loop.iteration }}..."
+          if [ {{ loop.iteration }} -ge 3 ]; then
+            echo "STATUS: ready"
+          else
+            echo "STATUS: not_ready"
+          fi
+        outputs:
+          attempt: "{{ loop.iteration }}"
+          status: '{{ if ge loop.iteration 3 }}ready{{ else }}not_ready{{ end }}'
+
+  # Search through items until a match is found
+  search_items:
+    desc: "Search a list until a valid item is found"
+    steps:
+      - name: find_valid
+        loop:
+          items: "{{ vars.search_items }}"
+          as: item
+          until: '{{ eq .loop.item.valid true }}'
+        func: shell
+        do: |
+          echo "Checking: {{ loop.item.name }} (valid={{ loop.item.valid }})"
+        outputs:
+          item_name: "{{ loop.item.name }}"
+          is_valid: "{{ loop.item.valid }}"
+
+  # JavaScript-style until condition
+  js_until_example:
+    desc: "Loop until a JavaScript condition is met"
+    steps:
+      - name: count_up
+        loop:
+          count: 10
+          until: 'loop.iteration > 5'
+        func: shell
+        do: echo "Iteration {{ loop.iteration }}"
+        outputs:
+          iteration: "{{ loop.iteration }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: loop-until-demo
+│ 📋 Break loops with until conditions
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: find_target
+│  💡 Loop until we reach the target number
+│
+└─ ⚡ STEP: count_to_target
+   ↻ Starting loop with 20 iterations for step 'count_to_target'
+     ↻ Iteration 1/20
+   ┌─ 💻 COMMAND: echo "Checking: 1"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Checking: 1
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/20
+   ┌─ 💻 COMMAND: echo "Checking: 2"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Checking: 2
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 3/20
+   ┌─ 💻 COMMAND: echo "Checking: 3"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Checking: 3
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/20
+   ┌─ 💻 COMMAND: echo "Checking: 4"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Checking: 4
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 5/20
+   ┌─ 💻 COMMAND: echo "Checking: 5"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Checking: 5
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Breaking loop at iteration 5/20 (until condition met)
+   ↻ Completed loop with 20 iterations
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'find_target' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## loop with conditions
+
+Loop with Conditions
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Loop with Conditions
+# Combine loops with "if:" to filter which iterations execute.
+# OrchStep evaluates the condition differently depending on context:
+#
+#   - if WITHOUT loop.* references -> evaluated ONCE before the loop
+#     (acts as a gate: run the entire loop or skip it)
+#   - if WITH loop.* references -> evaluated PER ITERATION
+#     (acts as a filter: skip individual items)
+#
+# Try: orchstep run
+# Try: orchstep run --var enable_deployment=false
+
+name: loop-with-conditions-demo
+desc: "Filter loop iterations using if conditions"
+
+defaults:
+  servers:
+    - name: "web-01"
+      type: "web"
+      enabled: true
+      port: 8080
+    - name: "web-02"
+      type: "web"
+      enabled: false
+      port: 8081
+    - name: "db-01"
+      type: "database"
+      enabled: true
+      port: 5432
+    - name: "cache-01"
+      type: "cache"
+      enabled: true
+      port: 6379
+  enable_deployment: true
+
+tasks:
+  main:
+    desc: "Deploy infrastructure with conditional filtering"
+    steps:
+      # Gate pattern: if without loop.* -> evaluated once
+      # If enable_deployment is false, the entire loop is skipped
+      - name: deploy_all
+        loop: '{{ vars.servers }}'
+        if: '{{ vars.enable_deployment }}'
+        func: shell
+        do: echo "Deploying {{ loop.item.name }} ({{ loop.item.type }})"
+
+      # Filter pattern: if with loop.item -> evaluated per iteration
+      # Only processes servers where enabled=true
+      - name: deploy_enabled_only
+        loop: '{{ vars.servers }}'
+        if: '{{ loop.item.enabled }}'
+        func: shell
+        do: 'echo "Deploying enabled server: {{ loop.item.name }} on port {{ loop.item.port }}"'
+
+      # Complex filter: multiple conditions
+      # Only web servers that are enabled
+      - name: deploy_web_servers
+        loop: '{{ vars.servers }}'
+        if: '{{ and (eq loop.item.type "web") loop.item.enabled }}'
+        func: shell
+        do: 'echo "Web server: {{ loop.item.name }} on port {{ loop.item.port }}"'
+
+      # Filter by type
+      - name: setup_databases
+        loop: '{{ vars.servers }}'
+        if: '{{ eq loop.item.type "database" }}'
+        func: shell
+        do: 'echo "Setting up database: {{ loop.item.name }} on port {{ loop.item.port }}"'
+
+      # Show iteration metadata with filtering
+      - name: enabled_server_report
+        loop: '{{ vars.servers }}'
+        if: '{{ loop.item.enabled }}'
+        func: shell
+        do: |
+          echo "Server {{ loop.index1 }}/{{ loop.length }}: {{ loop.item.name }}"
+          echo "  Type: {{ loop.item.type }}, Port: {{ loop.item.port }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: loop-with-conditions-demo
+│ 📋 Filter loop iterations using if conditions
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Deploy infrastructure with conditional filtering
+│
+├─ ⚡ STEP: deploy_all
+   ↻ Starting loop with 4 iterations for step 'deploy_all'
+     ↻ Iteration 1/4
+│  ┌─ 💻 COMMAND: echo "Deploying web-01 (web)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying web-01 (web)
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/4
+│  ┌─ 💻 COMMAND: echo "Deploying web-02 (web)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying web-02 (web)
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 3/4
+│  ┌─ 💻 COMMAND: echo "Deploying db-01 (database)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying db-01 (database)
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/4
+│  ┌─ 💻 COMMAND: echo "Deploying cache-01 (cache)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying cache-01 (cache)
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 4 iterations
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_enabled_only
+   ↻ Starting loop with 4 iterations for step 'deploy_enabled_only'
+     ↻ Iteration 1/4
+│  ┌─ 💻 COMMAND: echo "Deploying enabled server: web-01 on port 8080"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying enabled server: web-01 on port 8080
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/4
+     ↻ Iteration 3/4
+│  ┌─ 💻 COMMAND: echo "Deploying enabled server: db-01 on port 5432"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying enabled server: db-01 on port 5432
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/4
+│  ┌─ 💻 COMMAND: echo "Deploying enabled server: cache-01 on port 6379"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying enabled server: cache-01 on port 6379
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 4 iterations
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_web_servers
+   ↻ Starting loop with 4 iterations for step 'deploy_web_servers'
+     ↻ Iteration 1/4
+│  ┌─ 💻 COMMAND: echo "Web server: web-01 on port 8080"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Web server: web-01 on port 8080
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/4
+     ↻ Iteration 3/4
+     ↻ Iteration 4/4
+   ↻ Completed loop with 4 iterations
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: setup_databases
+   ↻ Starting loop with 4 iterations for step 'setup_databases'
+     ↻ Iteration 1/4
+     ↻ Iteration 2/4
+     ↻ Iteration 3/4
+│  ┌─ 💻 COMMAND: echo "Setting up database: db-01 on port 5432"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Setting up database: db-01 on port 5432
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/4
+   ↻ Completed loop with 4 iterations
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: enabled_server_report
+   ↻ Starting loop with 4 iterations for step 'enabled_server_report'
+     ↻ Iteration 1/4
+   ┌─ 💻 COMMAND: echo "Server 1/4: web-01"
+echo "  Type: web, Port: 8080"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Server 1/4: web-01
+        │   Type: web, Port: 8080
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 2/4
+     ↻ Iteration 3/4
+   ┌─ 💻 COMMAND: echo "Server 3/4: db-01"
+echo "  Type: database, Port: 5432"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Server 3/4: db-01
+        │   Type: database, Port: 5432
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+     ↻ Iteration 4/4
+   ┌─ 💻 COMMAND: echo "Server 4/4: cache-01"
+echo "  Type: cache, Port: 6379"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Server 4/4: cache-01
+        │   Type: cache, Port: 6379
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ↻ Completed loop with 4 iterations
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## loop with task call
+
+Loop with Task Call
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Loop with Task Call
+# Loops can call tasks using "task:" and pass per-iteration parameters
+# with "with:". This is ideal for deploying to multiple regions, running
+# the same operation across environments, etc.
+#
+# Key concepts:
+#   - "loop:" + "task:" calls the task once per iteration
+#   - "with:" passes loop data as task parameters
+#   - Loop variables (loop.item, loop.index, etc.) are available in "with:"
+#   - "as:" renames loop.item for clearer references
+#
+# Try: orchstep run
+
+name: loop-with-task-call-demo
+desc: "Call tasks in a loop with per-iteration parameters"
+
+defaults:
+  regions:
+    - name: "us-east-1"
+      replicas: 3
+      host: "east.example.com"
+    - name: "us-west-2"
+      replicas: 5
+      host: "west.example.com"
+    - name: "eu-west-1"
+      replicas: 7
+      host: "eu.example.com"
+
+tasks:
+  main:
+    desc: "Deploy to all regions"
+    steps:
+      # Loop through regions, calling deploy_region for each
+      - name: deploy_all_regions
+        desc: "Deploy to every region using a reusable task"
+        loop:
+          items: "{{ vars.regions }}"
+          as: region
+        task: deploy_region
+        with:
+          region_name: "{{ loop.region.name }}"
+          replica_count: "{{ loop.region.replicas }}"
+          host_name: "{{ loop.region.host }}"
+          progress: "{{ loop.index1 }}/{{ loop.length }}"
+
+  # Reusable task called once per region
+  deploy_region:
+    desc: "Deploy to a single region"
+    steps:
+      - name: show_config
+        func: shell
+        do: |
+          echo "=== Deploying Region [{{ vars.progress }}] ==="
+          echo "Region:   {{ vars.region_name }}"
+          echo "Host:     {{ vars.host_name }}"
+          echo "Replicas: {{ vars.replica_count }}"
+        outputs:
+          region: "{{ vars.region_name }}"
+          replicas: "{{ vars.replica_count }}"
+
+      - name: execute_deploy
+        func: shell
+        do: |
+          echo "kubectl apply -f deploy.yml \
+            --context={{ vars.region_name }} \
+            --replicas={{ vars.replica_count }}"
+          echo "Status: deployed"
+        outputs:
+          status: "deployed"
+          host: "{{ vars.host_name }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: loop-with-task-call-demo
+│ 📋 Call tasks in a loop with per-iteration parameters
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Deploy to all regions
+│
+└─ ⚡ STEP: deploy_all_regions
+   📝 Deploy to every region using a reusable task
+   ↻ Starting loop with 3 iterations for step 'deploy_all_regions'
+     ↻ Iteration 1/3
+   ┌─ 🔄 INVOKING SUBTASK: deploy_region
+
+┌─ 🎯 TASK: deploy_region
+│  💡 Deploy to a single region
+│
+├─ ⚡ STEP: show_config
+│  ┌─ 💻 COMMAND: echo "=== Deploying Region [1/3] ==="
+echo "Region:   us-east-1"
+echo "Host:     east.example.com"
+echo "Replicas: 3"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploying Region [1/3] ===
+│       │ Region:   us-east-1
+│       │ Host:     east.example.com
+│       │ Replicas: 3
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute_deploy
+   ┌─ 💻 COMMAND: echo "kubectl apply -f deploy.yml \
+  --context=us-east-1 \
+  --replicas=3"
+echo "Status: deployed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ kubectl apply -f deploy.yml   --context=us-east-1   --replicas=3
+        │ Status: deployed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_region' COMPLETED
+   └─ ✅ SUBTASK 'deploy_region' COMPLETED
+     ↻ Iteration 2/3
+   ┌─ 🔄 INVOKING SUBTASK: deploy_region
+
+┌─ 🎯 TASK: deploy_region
+│  💡 Deploy to a single region
+│
+├─ ⚡ STEP: show_config
+│  ┌─ 💻 COMMAND: echo "=== Deploying Region [2/3] ==="
+echo "Region:   us-west-2"
+echo "Host:     west.example.com"
+echo "Replicas: 5"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploying Region [2/3] ===
+│       │ Region:   us-west-2
+│       │ Host:     west.example.com
+│       │ Replicas: 5
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute_deploy
+   ┌─ 💻 COMMAND: echo "kubectl apply -f deploy.yml \
+  --context=us-west-2 \
+  --replicas=5"
+echo "Status: deployed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ kubectl apply -f deploy.yml   --context=us-west-2   --replicas=5
+        │ Status: deployed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_region' COMPLETED
+   └─ ✅ SUBTASK 'deploy_region' COMPLETED
+     ↻ Iteration 3/3
+   ┌─ 🔄 INVOKING SUBTASK: deploy_region
+
+┌─ 🎯 TASK: deploy_region
+│  💡 Deploy to a single region
+│
+├─ ⚡ STEP: show_config
+│  ┌─ 💻 COMMAND: echo "=== Deploying Region [3/3] ==="
+echo "Region:   eu-west-1"
+echo "Host:     eu.example.com"
+echo "Replicas: 7"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploying Region [3/3] ===
+│       │ Region:   eu-west-1
+│       │ Host:     eu.example.com
+│       │ Replicas: 7
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute_deploy
+   ┌─ 💻 COMMAND: echo "kubectl apply -f deploy.yml \
+  --context=eu-west-1 \
+  --replicas=7"
+echo "Status: deployed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ kubectl apply -f deploy.yml   --context=eu-west-1   --replicas=7
+        │ Status: deployed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_region' COMPLETED
+   └─ ✅ SUBTASK 'deploy_region' COMPLETED
+   ↻ Completed loop with 3 iterations
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

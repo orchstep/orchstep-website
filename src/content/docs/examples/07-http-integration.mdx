@@ -1,0 +1,977 @@
+---
+title: "HTTP Integration Examples"
+description: "OrchStep examples for HTTP requests, authentication, and batch operations"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## advanced patterns
+
+Advanced HTTP Patterns
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Advanced HTTP Patterns
+# Shows query parameters, custom headers, body from variables,
+# timeouts, TLS settings, and complex JSON payloads.
+#
+# Key patterns:
+#   query: { k: v }          - Structured query parameters
+#   headers: { K: V }        - Custom request headers
+#   body: "@vars.my_object"  - Send a variable as the request body
+#   body_json: "{{ ... }}"   - Template-rendered JSON string
+#   timeout: 5s              - Request timeout
+#   insecure: true           - Skip TLS verification
+#
+# Try: orchstep run query-params
+# Try: orchstep run body-from-variables
+# Try: orchstep run complex-payload
+
+name: advanced-http-patterns-demo
+desc: "Query params, headers, body from vars, and complex payloads"
+
+defaults:
+  api_base: "https://httpbin.org"
+
+tasks:
+  # -- Query parameters --
+  query-params:
+    desc: "Send structured query parameters"
+    steps:
+      # Method 1: Query parameters in args
+      - name: structured_query
+        func: http
+        args:
+          url: "{{ vars.api_base }}/get"
+          method: GET
+          query:
+            page: "1"
+            limit: "25"
+            filter: "active"
+            sort: "created_at"
+        outputs:
+          status: "{{ result.status_code }}"
+          page: "{{ result.data_object.args.page }}"
+
+      # Method 2: Query parameters in URL
+      - name: url_query
+        func: http
+        do: "GET {{ vars.api_base }}/get?foo=bar&baz=qux"
+        outputs:
+          foo: "{{ result.data_object.args.foo }}"
+
+      # Method 3: Mix URL params with structured params
+      - name: mixed_query
+        func: http
+        args:
+          url: "{{ vars.api_base }}/get?existing=value"
+          method: GET
+          query:
+            additional: "param"
+        outputs:
+          existing: "{{ result.data_object.args.existing }}"
+          additional: "{{ result.data_object.args.additional }}"
+
+  # -- Template variables in headers and query --
+  templated-request:
+    desc: "Use variables in headers, query, and body"
+    vars:
+      app_version: "2.5.0"
+      request_id: "req-abc-123"
+      user_id: "12345"
+      user_status: "active"
+    steps:
+      - name: templated_call
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          headers:
+            X-App-Version: "{{ vars.app_version }}"
+            X-Request-ID: "{{ vars.request_id }}"
+          query:
+            user: "{{ vars.user_id }}"
+            status: "{{ vars.user_status }}"
+          body:
+            name: "Widget Pro"
+            price: "99.99"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- Body from variables (three approaches) --
+  body-from-variables:
+    desc: "Build request body from workflow variables"
+    vars:
+      user_name: "Alice Johnson"
+      user_email: "alice@example.com"
+    steps:
+      # Approach 1: @vars reference - pass a variable object directly
+      - name: direct_object_ref
+        func: http
+        vars:
+          request_body:
+            name: "{{ vars.user_name }}"
+            email: "{{ vars.user_email }}"
+            role: "developer"
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body: "@vars.request_body"
+        outputs:
+          status: "{{ result.status_code }}"
+
+      # Approach 2: body_json with template string
+      - name: json_template
+        func: http
+        vars:
+          json_body: |
+            {
+              "name": "{{ vars.user_name }}",
+              "email": "{{ vars.user_email }}",
+              "department": "engineering"
+            }
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body_json: "{{ vars.json_body }}"
+        outputs:
+          status: "{{ result.status_code }}"
+
+      # Approach 3: Build body using step outputs
+      - name: get_user_id
+        func: shell
+        do: echo "usr-67890"
+        outputs:
+          user_id: "{{ result.output | trim }}"
+
+      - name: post_with_step_data
+        func: http
+        vars:
+          payload:
+            user_id: "{{ steps.get_user_id.user_id }}"
+            name: "{{ vars.user_name }}"
+            timestamp: "2024-06-15T10:00:00Z"
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body: "@vars.payload"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- Complex nested JSON payload --
+  complex-payload:
+    desc: "Send deeply nested JSON structures"
+    steps:
+      - name: create_order
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            customer:
+              id: 123
+              name: "John Doe"
+              email: "john@example.com"
+            items:
+              - id: 1
+                name: "Widget"
+                quantity: 5
+              - id: 2
+                name: "Gadget"
+                quantity: 3
+            metadata:
+              created_at: "2024-01-01T00:00:00Z"
+              tags: ["urgent", "wholesale"]
+        outputs:
+          status: "{{ result.status_code }}"
+          customer_id: "{{ result.data_object.json.customer.id }}"
+          first_item: '{{ (index result.data_object.json.items 0).name }}'
+
+  # -- Request timeout --
+  request-timeout:
+    desc: "Set timeout for HTTP requests"
+    steps:
+      - name: fast_request
+        func: http
+        args:
+          url: "{{ vars.api_base }}/delay/1"
+          method: GET
+          timeout: 5s       # Request must complete within 5 seconds
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- TLS settings --
+  tls-options:
+    desc: "Control TLS verification for internal services"
+    steps:
+      - name: secure_request
+        func: http
+        args:
+          url: "{{ vars.api_base }}/get"
+          method: GET
+          insecure: false    # Default: verify TLS certificates
+        outputs:
+          status: "{{ result.status_code }}"
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_fetch_api_data
+    task: fetch-api-data
+    expect:
+      success: true
+      output_contains:
+        - "Status: 200"
+        - "Method: GET"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## authentication
+
+HTTP Authentication Patterns
+
+```yaml
+# Example: HTTP Authentication Patterns
+# Shows how to authenticate HTTP requests with different methods:
+#
+#   Bearer token - auth: { type: bearer, token: "..." }
+#   Basic auth   - auth: { type: basic, username: "...", password: "..." }
+#   API key      - auth: { type: apikey, key: "...", in: header|query, name: "..." }
+#
+# Tokens and credentials should come from variables or environment
+# variables -- never hardcode secrets in workflow files.
+#
+# Try: orchstep run bearer-auth
+# Try: orchstep run api-key-auth
+
+name: authentication-demo
+desc: "Bearer, Basic, and API Key authentication patterns"
+
+defaults:
+  api_base: "https://httpbin.org"
+
+tasks:
+  # -- Bearer token authentication --
+  bearer-auth:
+    desc: "Authenticate with a Bearer token (e.g., OAuth2, JWT)"
+    vars:
+      # In real usage: orchstep run bearer-auth --var api_token=your-token
+      api_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example"
+    steps:
+      - name: call_protected_api
+        func: http
+        args:
+          url: "{{ vars.api_base }}/bearer"
+          method: GET
+          auth:
+            type: bearer
+            token: "{{ vars.api_token }}"
+        outputs:
+          status: "{{ result.status_code }}"
+          authenticated: "{{ result.data_object.authenticated }}"
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "Status: {{ steps.call_protected_api.status }}"
+          echo "Authenticated: {{ steps.call_protected_api.authenticated }}"
+
+  # -- Basic authentication --
+  basic-auth:
+    desc: "Authenticate with username and password"
+    vars:
+      # In real usage: pass via --var or environment variables
+      username: "admin"
+      password: "secret"
+    steps:
+      - name: login_to_service
+        func: http
+        args:
+          url: "{{ vars.api_base }}/basic-auth/{{ vars.username }}/{{ vars.password }}"
+          method: GET
+          auth:
+            type: basic
+            username: "{{ vars.username }}"
+            password: "{{ vars.password }}"
+        outputs:
+          status: "{{ result.status_code }}"
+          authenticated: "{{ result.data_object.authenticated }}"
+          user: "{{ result.data_object.user }}"
+
+  # -- API key in header --
+  api-key-auth:
+    desc: "Authenticate with an API key sent in a header"
+    vars:
+      # In real usage: orchstep run api-key-auth --var api_key=your-key
+      api_key: "sk-prod-abc123def456"
+    steps:
+      - name: call_with_api_key
+        func: http
+        args:
+          url: "{{ vars.api_base }}/headers"
+          method: GET
+          auth:
+            type: apikey
+            key: "{{ vars.api_key }}"
+            in: header              # Send key as a header
+            name: "X-API-Key"      # Header name
+        outputs:
+          status: "{{ result.status_code }}"
+          api_key_sent: '{{ index result.data_object.headers "X-Api-Key" }}'
+
+  # -- API key in query parameter --
+  api-key-query:
+    desc: "Authenticate with an API key in the URL query string"
+    vars:
+      api_key: "pk-query-789xyz"
+    steps:
+      - name: call_with_query_key
+        func: http
+        args:
+          url: "{{ vars.api_base }}/get"
+          method: GET
+          auth:
+            type: apikey
+            key: "{{ vars.api_key }}"
+            in: query               # Send key as a query parameter
+            name: "api_key"         # Query parameter name
+        outputs:
+          status: "{{ result.status_code }}"
+          api_key_param: "{{ result.data_object.args.api_key }}"
+
+  # -- Combine auth with custom headers --
+  auth-with-custom-headers:
+    desc: "Use API key auth alongside additional custom headers"
+    steps:
+      - name: enriched_request
+        func: http
+        args:
+          url: "{{ vars.api_base }}/headers"
+          method: GET
+          headers:
+            X-Request-ID: "req-999-abc"
+            X-Client-Version: "3.0.0"
+          auth:
+            type: apikey
+            key: "my-api-key-123"
+            in: header
+            name: "X-API-Key"
+        outputs:
+          status: "{{ result.status_code }}"
+          request_id: '{{ index result.data_object.headers "X-Request-Id" }}'
+          api_key: '{{ index result.data_object.headers "X-Api-Key" }}'
+```
+
+---
+
+## uasic get request
+
+Basic HTTP GET Requests
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Basic HTTP GET Requests
+# Shows how to make GET requests with the built-in http function.
+#
+# The http function supports two syntaxes:
+#   - Short form:  do: "GET https://api.example.com/data"
+#   - Args form:   args: { url: "...", method: GET }
+#
+# Response data is available via:
+#   result.status_code   - HTTP status code (200, 404, etc.)
+#   result.body          - Raw response body as string
+#   result.data_object   - Auto-parsed JSON response (if JSON)
+#   result.headers       - Response headers map
+#   result.url           - Requested URL
+#   result.method        - HTTP method used
+#
+# Try: orchstep run fetch-api-data
+# Try: orchstep run get-with-variables
+
+name: basic-get-request-demo
+desc: "HTTP GET requests with variable URLs and response parsing"
+
+defaults:
+  api_base: "https://httpbin.org"
+
+tasks:
+  # -- Simple GET request --
+  fetch-api-data:
+    desc: "Fetch data from a REST API"
+    steps:
+      - name: get_users
+        func: http
+        do: "GET {{ vars.api_base }}/get"
+        outputs:
+          status: "{{ result.status_code }}"
+          url: "{{ result.url }}"
+          method: "{{ result.method }}"
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "Status: {{ steps.get_users.status }}"
+          echo "URL: {{ steps.get_users.url }}"
+          echo "Method: {{ steps.get_users.method }}"
+
+  # -- GET with template variables in the URL --
+  get-with-variables:
+    desc: "Build URLs dynamically using variables"
+    vars:
+      resource: "users"
+      api_version: "v2"
+    steps:
+      - name: fetch_resource
+        func: http
+        do: "GET {{ vars.api_base }}/{{ vars.resource }}"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- GET using args syntax --
+  get-args-syntax:
+    desc: "Use explicit args instead of the do shorthand"
+    steps:
+      - name: fetch_with_args
+        func: http
+        args:
+          url: "{{ vars.api_base }}/get"
+          method: GET
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- Parse JSON response --
+  parse-json-response:
+    desc: "Access fields from a JSON response body"
+    steps:
+      - name: get_json_data
+        func: http
+        do: "GET {{ vars.api_base }}/json"
+        outputs:
+          # Auto-parsed JSON fields via result.data_object
+          author: "{{ result.data_object.slideshow.author }}"
+          title: "{{ result.data_object.slideshow.title }}"
+
+      - name: display_parsed_data
+        func: shell
+        do: |
+          echo "Author: {{ steps.get_json_data.author }}"
+          echo "Title: {{ steps.get_json_data.title }}"
+
+  # -- Access response headers --
+  read-response-headers:
+    desc: "Read headers from the HTTP response"
+    steps:
+      - name: get_with_headers
+        func: http
+        do: "GET {{ vars.api_base }}/response-headers?X-Custom=hello"
+        outputs:
+          content_type: '{{ index result.headers "Content-Type" }}'
+          custom_header: '{{ index result.headers "X-Custom" }}'
+
+      - name: show_headers
+        func: shell
+        do: |
+          echo "Content-Type: {{ steps.get_with_headers.content_type }}"
+          echo "X-Custom: {{ steps.get_with_headers.custom_header }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: basic-get-request-demo
+│ 📋 HTTP GET requests with variable URLs and response parsing
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: fetch-api-data
+│  💡 Fetch data from a REST API
+│
+├─ ⚡ STEP: get_users
+│  ┌─ 💻 COMMAND: GET http://localhost:8080/get
+│  └─ 📤 OUTPUT: GET request received at /get from [::1]:51795
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_result
+   ┌─ 💻 COMMAND: echo "Status: 200"
+echo "URL: http://localhost:8080/get"
+echo "Method: GET"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Status: 200
+        │ URL: http://localhost:8080/get
+        │ Method: GET
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'fetch-api-data' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## uatch requests
+
+Batch HTTP Requests with Loops
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Batch HTTP Requests with Loops
+# Shows how to make multiple HTTP requests using loop,
+# with data transformation via map_in and map_out.
+#
+# map_in:  JavaScript that runs BEFORE the request to prepare data
+# map_out: JavaScript that runs AFTER the response to transform results
+# loop:    Iterate over a list, making one request per item
+#
+# In map_in/map_out, use:
+#   spec.<name> = value  - Set a variable for use in the request/outputs
+#   vars.<name>          - Read workflow variables
+#   result.*             - (map_out only) Access the HTTP response
+#
+# Try: orchstep run batch-create
+# Try: orchstep run process-products
+
+name: batch-http-requests-demo
+desc: "HTTP requests with loops, map_in, and map_out"
+
+defaults:
+  api_base: "https://httpbin.org"
+
+tasks:
+  # -- Loop over items for batch requests --
+  batch-create:
+    desc: "Create multiple resources in a batch"
+    vars:
+      resources:
+        - { id: 1, action: "create", name: "Web Server" }
+        - { id: 2, action: "create", name: "Database" }
+        - { id: 3, action: "create", name: "Cache Layer" }
+    steps:
+      - name: create_resources
+        func: http
+        loop:
+          items: "{{ vars.resources }}"
+          as: resource
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            id: "{{ loop.resource.id }}"
+            action: "{{ loop.resource.action }}"
+            name: "{{ loop.resource.name }}"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- map_in: Transform data before sending --
+  computed-request:
+    desc: "Use map_in to compute values before the request"
+    vars:
+      first_name: "John"
+      last_name: "Doe"
+    steps:
+      - name: build_and_send
+        func: http
+        map_in: |
+          // Compute derived fields in JavaScript
+          spec.full_name = vars.first_name + " " + vars.last_name;
+          spec.username = vars.first_name.toLowerCase() + vars.last_name.toLowerCase();
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            name: "{{ vars.full_name }}"
+            username: "{{ vars.username }}"
+        outputs:
+          posted_name: "{{ result.data_object.json.name }}"
+          posted_username: "{{ result.data_object.json.username }}"
+
+  # -- map_out: Transform the response --
+  transform-response:
+    desc: "Use map_out to extract and compute from response data"
+    steps:
+      - name: get_and_transform
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            user:
+              first_name: "Alice"
+              last_name: "Johnson"
+              age: 30
+        map_out: |
+          // Extract and transform response fields
+          var user = result.data_object.json.user;
+          spec.display_name = user.first_name + " " + user.last_name;
+          spec.age_group = user.age < 18 ? "minor" : user.age < 65 ? "adult" : "senior";
+          spec.initials = user.first_name.charAt(0) + user.last_name.charAt(0);
+        outputs:
+          display_name: "{{ vars.display_name }}"
+          age_group: "{{ vars.age_group }}"
+          initials: "{{ vars.initials }}"
+
+  # -- Loop + map_in + map_out combined --
+  process-products:
+    desc: "Process a product catalog: compute totals per item"
+    vars:
+      products:
+        - { name: "Widget", price: 9.99, quantity: 5 }
+        - { name: "Gadget", price: 19.99, quantity: 3 }
+        - { name: "Doohickey", price: 29.99, quantity: 2 }
+    steps:
+      - name: process_each_product
+        func: http
+        loop:
+          items: "{{ vars.products }}"
+          var: product
+        map_in: |
+          // Calculate line item total before sending
+          spec.item_total = (vars.product.price * vars.product.quantity).toFixed(2);
+          spec.item_name = vars.product.name.toUpperCase();
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            name: "{{ vars.item_name }}"
+            price: "{{ vars.product.price }}"
+            quantity: "{{ vars.product.quantity }}"
+            total: "{{ vars.item_total }}"
+        map_out: |
+          // Build a summary line from the response
+          var data = result.data_object.json;
+          spec.summary = data.name + ": $" + data.total;
+        outputs:
+          summary: "{{ vars.summary }}"
+
+  # -- Aggregate data from batch responses --
+  aggregate-inventory:
+    desc: "Post items and aggregate totals from responses"
+    steps:
+      - name: post_inventory
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            items:
+              - { name: "Apple", quantity: 5, price: 1.20 }
+              - { name: "Banana", quantity: 3, price: 0.80 }
+              - { name: "Orange", quantity: 7, price: 1.50 }
+        map_out: |
+          // Aggregate totals from the response
+          var items = result.data_object.json.items;
+          var totalCost = 0;
+          var totalQty = 0;
+          var names = [];
+
+          for (var i = 0; i < items.length; i++) {
+            totalCost += items[i].quantity * items[i].price;
+            totalQty += items[i].quantity;
+            names.push(items[i].name);
+          }
+
+          spec.total_cost = totalCost.toFixed(2);
+          spec.total_quantity = totalQty;
+          spec.item_list = names.join(", ");
+        outputs:
+          total_cost: "{{ vars.total_cost }}"
+          total_qty: "{{ vars.total_quantity }}"
+          items: "{{ vars.item_list }}"
+
+      - name: show_totals
+        func: shell
+        do: |
+          echo "Inventory Summary"
+          echo "Items: {{ steps.post_inventory.items }}"
+          echo "Total Quantity: {{ steps.post_inventory.total_qty }}"
+          echo "Total Cost: ${{ steps.post_inventory.total_cost }}"
+
+  # -- Loop with error handling --
+  resilient-batch:
+    desc: "Process batch with error handling per item"
+    vars:
+      endpoints:
+        - "/post"
+        - "/status/404"
+        - "/post"
+    steps:
+      - name: call_endpoints
+        func: http
+        loop:
+          items: "{{ vars.endpoints }}"
+          as: path
+          on_error: continue    # Continue loop even if one request fails
+        args:
+          url: "{{ vars.api_base }}{{ loop.path }}"
+          method: GET
+        outputs:
+          status: "{{ result.status_code }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: batch-http-requests-demo
+│ 📋 HTTP requests with loops, map_in, and map_out
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: batch-create
+│  💡 Create multiple resources in a batch
+│
+└─ ⚡ STEP: create_resources
+   ↻ Starting loop with 3 iterations for step 'create_resources'
+     ↻ Iteration 1/3
+   ┌─ 💻 COMMAND: POST http://localhost:8080/post
+   └─ 📤 OUTPUT: {"action":"create","args":{},"data":{"action":"create","id":"1","name":"Web Server"},"headers":{"Accept-Encoding":"gzip","Content-Length":"48","Content-Type":"application/json","User-Agent":"Go-http-c... (295 bytes)
+     ↻ Iteration 2/3
+   ┌─ 💻 COMMAND: POST http://localhost:8080/post
+   └─ 📤 OUTPUT: {"action":"create","args":{},"data":{"action":"create","id":"2","name":"Database"},"headers":{"Accept-Encoding":"gzip","Content-Length":"46","Content-Type":"application/json","User-Agent":"Go-http-cli... (291 bytes)
+     ↻ Iteration 3/3
+   ┌─ 💻 COMMAND: POST http://localhost:8080/post
+   └─ 📤 OUTPUT: {"action":"create","args":{},"data":{"action":"create","id":"3","name":"Cache Layer"},"headers":{"Accept-Encoding":"gzip","Content-Length":"49","Content-Type":"application/json","User-Agent":"Go-http-... (297 bytes)
+   ↻ Completed loop with 3 iterations
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'batch-create' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## rest api methods
+
+REST API Methods (POST, PUT, PATCH, DELETE)
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: REST API Methods (POST, PUT, PATCH, DELETE)
+# Shows how to use all standard HTTP methods with JSON payloads.
+#
+# Body can be specified as:
+#   body: { ... }         - YAML object (auto-serialized to JSON)
+#   body: "text"          - Plain text body
+#   body_json: '{"k":"v"}'- JSON string
+#
+# Try: orchstep run create-user
+# Try: orchstep run crud-workflow
+
+name: rest-api-methods-demo
+desc: "POST, PUT, PATCH, DELETE with JSON bodies"
+
+defaults:
+  api_base: "https://httpbin.org"
+
+tasks:
+  # -- POST with JSON body --
+  create-user:
+    desc: "Create a resource with POST"
+    steps:
+      - name: create_user
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            name: "Alice Johnson"
+            email: "alice@example.com"
+            role: "developer"
+            active: true
+        outputs:
+          status: "{{ result.status_code }}"
+          created_name: "{{ result.data_object.json.name }}"
+
+      - name: confirm
+        func: shell
+        do: |
+          echo "Created user: {{ steps.create_user.created_name }}"
+          echo "Status: {{ steps.create_user.status }}"
+
+  # -- POST with plain text body --
+  post-plain-text:
+    desc: "Send plain text content"
+    steps:
+      - name: send_log
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body: "2024-01-15T10:30:00Z [INFO] Deployment completed successfully"
+          headers:
+            Content-Type: "text/plain"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- POST with JSON string body --
+  post-json-string:
+    desc: "Send a pre-formed JSON string"
+    steps:
+      - name: send_order
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body_json: '{"product": "OrchStep Pro", "quantity": 5, "price": 99.99}'
+        outputs:
+          status: "{{ result.status_code }}"
+          product: "{{ result.data_object.json.product }}"
+
+  # -- PUT to update a resource --
+  update-user:
+    desc: "Update an existing resource with PUT"
+    vars:
+      user_id: "usr-12345"
+    steps:
+      - name: update_user_data
+        func: http
+        args:
+          url: "{{ vars.api_base }}/put"
+          method: PUT
+          body:
+            id: "{{ vars.user_id }}"
+            name: "Alice Smith"
+            email: "alice.smith@example.com"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- PATCH for partial update --
+  patch-user-email:
+    desc: "Partially update a resource with PATCH"
+    steps:
+      - name: patch_email
+        func: http
+        args:
+          url: "{{ vars.api_base }}/patch"
+          method: PATCH
+          body:
+            email: "newemail@example.com"
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- DELETE a resource --
+  delete-user:
+    desc: "Remove a resource with DELETE"
+    steps:
+      - name: delete_resource
+        func: http
+        args:
+          url: "{{ vars.api_base }}/delete?id=usr-12345"
+          method: DELETE
+        outputs:
+          status: "{{ result.status_code }}"
+
+  # -- Full CRUD workflow --
+  crud-workflow:
+    desc: "Create, read, update, delete in sequence"
+    steps:
+      - name: create_item
+        func: http
+        args:
+          url: "{{ vars.api_base }}/post"
+          method: POST
+          body:
+            title: "New Feature"
+            description: "Add retry with jitter support"
+            priority: "high"
+        outputs:
+          status: "{{ result.status_code }}"
+
+      - name: update_item
+        func: http
+        args:
+          url: "{{ vars.api_base }}/put"
+          method: PUT
+          headers:
+            X-Request-ID: "req-98765"
+            X-Client-Version: "2.0.0"
+          body:
+            title: "New Feature (Updated)"
+            status: "in_progress"
+        outputs:
+          status: "{{ result.status_code }}"
+          request_id: '{{ index result.data_object.headers "X-Request-Id" }}'
+
+      - name: delete_item
+        func: http
+        args:
+          url: "{{ vars.api_base }}/delete?id=feat-001"
+          method: DELETE
+        outputs:
+          status: "{{ result.status_code }}"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "CRUD workflow complete"
+          echo "Create: {{ steps.create_item.status }}"
+          echo "Update: {{ steps.update_item.status }}"
+          echo "Delete: {{ steps.delete_item.status }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: rest-api-methods-demo
+│ 📋 POST, PUT, PATCH, DELETE with JSON bodies
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: crud-workflow
+│  💡 Create, read, update, delete in sequence
+│
+├─ ⚡ STEP: create_item
+│  ┌─ 💻 COMMAND: POST http://localhost:8080/post
+│  └─ 📤 OUTPUT: {"args":{},"data":{"description":"Add retry with jitter support","priority":"high","title":"New Feature"},"description":"Add retry with jitter support","headers":{"Accept-Encoding":"gzip","Content-Len... (373 bytes)
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: update_item
+│  ┌─ 💻 COMMAND: PUT http://localhost:8080/put
+│  └─ 📤 OUTPUT: {"args":{},"data":{"status":"in_progress","title":"New Feature (Updated)"},"headers":{"Accept-Encoding":"gzip","Content-Length":"56","Content-Type":"application/json","User-Agent":"Go-http-client/1.1"... (363 bytes)
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: delete_item
+│  ┌─ 💻 COMMAND: DELETE http://localhost:8080/delete?id=feat-001
+│  └─ 📤 OUTPUT: {"args":{"id":"feat-001"},"method":"DELETE","origin":"[::1]:51801","url":"/delete?id=feat-001"}
+
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "CRUD workflow complete"
+echo "Create: 200"
+echo "Update: 200"
+echo "Delete: 200"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ CRUD workflow complete
+        │ Create: 200
+        │ Update: 200
+        │ Delete: 200
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'crud-workflow' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

@@ -1,0 +1,1273 @@
+---
+title: "Error Handling Examples"
+description: "OrchStep examples for retry, on_error, try/catch/finally"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## uasic retry
+
+Basic Retry with Backoff
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Basic Retry with Backoff
+# Shows how to automatically retry failed steps with configurable
+# max attempts, interval, and exponential backoff.
+#
+# Retry is useful for flaky operations like network calls,
+# cloud API requests, or CI/CD deployments.
+#
+# Try: orchstep run deploy-with-retry
+# Try: orchstep run health-check
+
+name: basic-retry-demo
+desc: "Automatic retry for unreliable operations"
+
+tasks:
+  # -- Retry a deployment that may fail transiently --
+  deploy-with-retry:
+    desc: "Deploy service with automatic retry on failure"
+    steps:
+      - name: deploy_service
+        func: shell
+        do: |
+          echo "Deploying payment-service..."
+          # In real usage: kubectl apply -f deployment.yml
+          # Simulating a flaky deploy that succeeds on attempt 3
+          COUNT_FILE="/tmp/deploy_attempt"
+          if [ -f "$COUNT_FILE" ]; then
+            COUNT=$(cat $COUNT_FILE)
+          else
+            COUNT=0
+          fi
+          COUNT=$((COUNT + 1))
+          echo $COUNT > $COUNT_FILE
+          echo "Attempt: $COUNT"
+          if [ $COUNT -lt 3 ]; then
+            echo "Error: connection reset by peer"
+            exit 1
+          fi
+          echo "Deployment successful"
+        retry:
+          max_attempts: 5       # Try up to 5 times
+          interval: 100ms       # Start with 100ms between attempts
+          backoff_rate: 1.5     # Each wait = previous * 1.5
+        outputs:
+          result: "{{ result.output }}"
+
+      - name: cleanup
+        func: shell
+        do: rm -f /tmp/deploy_attempt
+
+  # -- Retry with a delay cap --
+  health-check:
+    desc: "Health check with capped backoff delay"
+    steps:
+      - name: check_service
+        func: shell
+        do: |
+          echo "Checking service health..."
+          # In real usage: curl -f http://service:8080/healthz
+          echo "Service responding"
+        retry:
+          max_attempts: 4
+          interval: 500ms       # Start at 500ms
+          backoff_rate: 3.0     # Aggressive backoff: 500ms -> 1.5s -> 4.5s
+          max_delay: 2s         # But never wait more than 2 seconds
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: basic-retry-demo
+│ 📋 Automatic retry for unreliable operations
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: deploy-with-retry
+│  💡 Deploy service with automatic retry on failure
+│
+├─ ⚡ STEP: deploy_service
+│  ┌─ 💻 COMMAND: echo "Deploying payment-service..."
+# In real usage: kubectl apply -f deployment.yml
+# Simulating a flaky deploy that succeeds on attempt 3
+COUNT_FILE="/tmp/deploy_attempt"
+if [ -f "$COUNT_FILE" ]; then
+  COUNT=$(cat $COUNT_FILE)
+else
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+echo $COUNT > $COUNT_FILE
+echo "Attempt: $COUNT"
+if [ $COUNT -lt 3 ]; then
+  echo "Error: connection reset by peer"
+  exit 1
+fi
+echo "Deployment successful"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying payment-service...
+│       │ Attempt: 1
+│       │ Error: connection reset by peer
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+
+│  ╭───────────────────────────────────────────────────────────────────────────────╮
+│  │ ❌ WORKFLOW EXECUTION FAILED                                                  │
+│  ╰───────────────────────────────────────────────────────────────────────────────╯
+│  │
+│  │ 📍 Location:
+│  │    File: /Users/mindbuger/data/git/orchstep/orchstep-public/examples/06-error-handling/basic-retry.yml
+│  │    Workflow: basic-retry-demo
+│  │    Task: deploy-with-retry
+│  │    Step: deploy_service (line 19)
+│  │
+│  │ 🚨 Error: exit status 1
+│  │
+│  │ 💻 Command: [31mecho "Deploying payment-service..."
+# In real usage: kubectl apply -f deployment.yml
+# Simulating a flaky deploy that succeeds on attempt 3
+COUNT_FILE="/tmp/deploy_attempt"
+if [ -f "$COUNT_FILE" ]; then
+  COUNT=$(cat $COUNT_FILE)
+else
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+echo $COUNT > $COUNT_FILE
+echo "Attempt: $COUNT"
+if [ $COUNT -lt 3 ]; then
+  echo "Error: connection reset by peer"
+  exit 1
+fi
+echo "Deployment successful"
+[0m
+│  │    Exit Code: 1
+│  │
+│  │ 📤 Error Output:
+│  │    │ Deploying payment-service...
+│  │    │ Attempt: 1
+│  │    │ Error: connection reset by peer
+│  │
+│  │ 💡 Analysis:
+│  │    Type: Command execution failed (exit code 1)
+│  │    Cause: The command ran but returned an error
+│  │    Fix: Check the command's stderr output for specific error messages. Verify command arguments and input data.
+│  │
+│  │    Common Issues:
+│  │    • Invalid command arguments
+│  │    • Missing required files or data
+│  │    • Application-specific error
+│  │
+│  │ 📝 Code Context:
+│  │  ➤   19 |       - name: deploy_service
+│  │      20 |         func: shell
+│  │      21 |         do: |
+│  │      22 |           echo "Deploying payment-service..."
+│  │      23 |           # In real usage: kubectl apply -f deployment.yml
+│  │      24 |           # Simulating a flaky deploy that succeeds on attempt 3
+│  │      25 |           COUNT_FILE="/tmp/deploy_attempt"
+│  │      26 |           if [ -f "$COUNT_FILE" ]; then
+│  │      27 |             COUNT=$(cat $COUNT_FILE)
+│  │      28 |           else
+│  │      29 |             COUNT=0
+│  │      30 |           fi
+│  │      31 |           COUNT=$((COUNT + 1))
+│  │      32 |           echo $COUNT > $COUNT_FILE
+│  │      33 |           echo "Attempt: $COUNT"
+│  │      34 |           if [ $COUNT -lt 3 ]; then
+│  │      35 |             echo "Error: connection reset by peer"
+│  │      36 |             exit 1
+│  │      37 |           fi
+│  │      38 |           echo "Deployment successful"
+│  │      39 |         retry:
+│  │      40 |           max_attempts: 5       # Try up to 5 times
+│  │      41 |           interval: 100ms       # Start with 100ms between attempts
+│  │      42 |           backoff_rate: 1.5     # Each wait = previous * 1.5
+│  │      43 |         outputs:
+│  │      44 |           result: "{{ result.output }}"
+│  │      45 | 
+│  ╰───────────────────────────────────────────────────────────────────────────────╯
+⚠️  Step 'deploy_service' failed (attempt 1/5), retrying in 100ms...
+│  ┌─ 💻 COMMAND: echo "Deploying payment-service..."
+# In real usage: kubectl apply -f deployment.yml
+# Simulating a flaky deploy that succeeds on attempt 3
+COUNT_FILE="/tmp/deploy_attempt"
+if [ -f "$COUNT_FILE" ]; then
+  COUNT=$(cat $COUNT_FILE)
+else
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+echo $COUNT > $COUNT_FILE
+echo "Attempt: $COUNT"
+if [ $COUNT -lt 3 ]; then
+  echo "Error: connection reset by peer"
+  exit 1
+fi
+echo "Deployment successful"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying payment-service...
+│       │ Attempt: 2
+│       │ Error: connection reset by peer
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+
+│  ╭───────────────────────────────────────────────────────────────────────────────╮
+│  │ ❌ WORKFLOW EXECUTION FAILED                                                  │
+│  ╰───────────────────────────────────────────────────────────────────────────────╯
+│  │
+│  │ 📍 Location:
+│  │    File: /Users/mindbuger/data/git/orchstep/orchstep-public/examples/06-error-handling/basic-retry.yml
+│  │    Workflow: basic-retry-demo
+│  │    Task: deploy-with-retry
+│  │    Step: deploy_service (line 19)
+│  │
+│  │ 🚨 Error: exit status 1
+│  │
+│  │ 💻 Command: [31mecho "Deploying payment-service..."
+# In real usage: kubectl apply -f deployment.yml
+# Simulating a flaky deploy that succeeds on attempt 3
+COUNT_FILE="/tmp/deploy_attempt"
+if [ -f "$COUNT_FILE" ]; then
+  COUNT=$(cat $COUNT_FILE)
+else
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+echo $COUNT > $COUNT_FILE
+echo "Attempt: $COUNT"
+if [ $COUNT -lt 3 ]; then
+  echo "Error: connection reset by peer"
+  exit 1
+fi
+echo "Deployment successful"
+[0m
+│  │    Exit Code: 1
+│  │
+│  │ 📤 Error Output:
+│  │    │ Deploying payment-service...
+│  │    │ Attempt: 2
+│  │    │ Error: connection reset by peer
+│  │
+│  │ 💡 Analysis:
+│  │    Type: Command execution failed (exit code 1)
+│  │    Cause: The command ran but returned an error
+│  │    Fix: Check the command's stderr output for specific error messages. Verify command arguments and input data.
+│  │
+│  │    Common Issues:
+│  │    • Invalid command arguments
+│  │    • Missing required files or data
+│  │    • Application-specific error
+│  │
+│  │ 📝 Code Context:
+│  │  ➤   19 |       - name: deploy_service
+│  │      20 |         func: shell
+│  │      21 |         do: |
+│  │      22 |           echo "Deploying payment-service..."
+│  │      23 |           # In real usage: kubectl apply -f deployment.yml
+│  │      24 |           # Simulating a flaky deploy that succeeds on attempt 3
+│  │      25 |           COUNT_FILE="/tmp/deploy_attempt"
+│  │      26 |           if [ -f "$COUNT_FILE" ]; then
+│  │      27 |             COUNT=$(cat $COUNT_FILE)
+│  │      28 |           else
+│  │      29 |             COUNT=0
+│  │      30 |           fi
+│  │      31 |           COUNT=$((COUNT + 1))
+│  │      32 |           echo $COUNT > $COUNT_FILE
+│  │      33 |           echo "Attempt: $COUNT"
+│  │      34 |           if [ $COUNT -lt 3 ]; then
+│  │      35 |             echo "Error: connection reset by peer"
+│  │      36 |             exit 1
+│  │      37 |           fi
+│  │      38 |           echo "Deployment successful"
+│  │      39 |         retry:
+│  │      40 |           max_attempts: 5       # Try up to 5 times
+│  │      41 |           interval: 100ms       # Start with 100ms between attempts
+│  │      42 |           backoff_rate: 1.5     # Each wait = previous * 1.5
+│  │      43 |         outputs:
+│  │      44 |           result: "{{ result.output }}"
+│  │      45 | 
+│  ╰───────────────────────────────────────────────────────────────────────────────╯
+⚠️  Step 'deploy_service' failed (attempt 2/5), retrying in 150ms...
+│  ┌─ 💻 COMMAND: echo "Deploying payment-service..."
+# In real usage: kubectl apply -f deployment.yml
+# Simulating a flaky deploy that succeeds on attempt 3
+COUNT_FILE="/tmp/deploy_attempt"
+if [ -f "$COUNT_FILE" ]; then
+  COUNT=$(cat $COUNT_FILE)
+else
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+echo $COUNT > $COUNT_FILE
+echo "Attempt: $COUNT"
+if [ $COUNT -lt 3 ]; then
+  echo "Error: connection reset by peer"
+  exit 1
+fi
+echo "Deployment successful"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying payment-service...
+│       │ Attempt: 3
+│       │ Deployment successful
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: cleanup
+   ┌─ 💻 COMMAND: rm -f /tmp/deploy_attempt
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy-with-retry' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_resilient_deploy
+    task: resilient-deploy
+    expect:
+      success: true
+      output_contains:
+        - "Deploying application to cluster..."
+        - "Deployment successful"
+
+  - name: test_api_with_backoff
+    task: api-with-backoff
+    expect:
+      success: true
+      output_contains:
+        - "Calling rate-limited API..."
+        - "Response received"
+
+  - name: test_parallel_service_calls
+    task: parallel-service-calls
+    expect:
+      success: true
+      output_contains:
+        - "Authenticating with auth service..."
+        - "Fetching data from data service..."
+        - "Aggregating service responses..."
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## conditional retry
+
+Conditional Retry
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Conditional Retry
+# Shows how to retry only when a specific condition is met,
+# using the `when` clause inside retry configuration.
+#
+# Conditions can be written in JavaScript or Go template syntax.
+# Available context: result.exit_code, result.output, retry.attempt, vars.*
+#
+# Try: orchstep run retry-on-timeout
+# Try: orchstep run retry-on-output-match
+
+name: conditional-retry-demo
+desc: "Retry only when specific conditions are met"
+
+tasks:
+  # -- Retry only on timeout exit codes --
+  retry-on-timeout:
+    desc: "Retry network calls only when they time out (exit code 124)"
+    steps:
+      - name: call_external_api
+        func: shell
+        do: |
+          echo "Calling payment gateway..."
+          # In real usage: curl --max-time 5 https://api.payment.com/charge
+          # Exit code 124 = timeout, 0 = success, other = permanent error
+          echo "Request completed"
+        retry:
+          max_attempts: 3
+          interval: 2s
+          # JavaScript expression: only retry on timeout
+          when: |
+            result.exit_code == 124
+
+  # -- Retry based on output content --
+  retry-on-output-match:
+    desc: "Retry only when output indicates a transient error"
+    steps:
+      - name: sync_database
+        func: shell
+        do: |
+          echo "Syncing database replica..."
+          # In real usage: pg_basebackup or similar
+          echo "Sync complete"
+        retry:
+          max_attempts: 5
+          interval: 1s
+          # JavaScript: retry when output contains "timeout" or "connection refused"
+          when: |
+            result.exit_code != 0 && result.output.includes('timeout')
+
+  # -- Retry with attempt-aware logic --
+  retry-with-escalation:
+    desc: "Change retry behavior based on attempt number"
+    steps:
+      - name: provision_resource
+        func: shell
+        do: |
+          echo "Provisioning cloud resource..."
+          # In real usage: terraform apply
+          echo "Resource provisioned"
+        retry:
+          max_attempts: 5
+          interval: 1s
+          # JavaScript: stop retrying after 3 attempts for exit code 1
+          when: |
+            retry.attempt < 3 && result.exit_code == 1
+
+  # -- Go template syntax for conditions --
+  retry-go-template:
+    desc: "Retry using Go template when condition"
+    steps:
+      - name: deploy_container
+        func: shell
+        do: |
+          echo "Pulling and deploying container image..."
+          # In real usage: docker pull && docker run
+          echo "Container deployed"
+        retry:
+          max_attempts: 4
+          interval: 500ms
+          # Go template syntax: retry on non-zero exit with retryable output
+          when: '{{ and (ne .result.exit_code 0) (contains "Retryable" .result.output) }}'
+
+  # -- Retry with variable-based conditions --
+  retry-with-vars:
+    desc: "Use task variables in retry conditions"
+    vars:
+      max_retryable_exit_code: 10
+    steps:
+      - name: run_migration
+        func: shell
+        do: |
+          echo "Running database migration..."
+          # In real usage: flyway migrate or alembic upgrade
+          echo "Migration complete"
+        retry:
+          max_attempts: 3
+          interval: 500ms
+          # JavaScript: only retry if exit code is within retryable range
+          when: |
+            result.exit_code <= vars.max_retryable_exit_code
+
+  # -- Multiple AND conditions --
+  retry-multi-condition:
+    desc: "Retry only when multiple conditions match"
+    steps:
+      - name: push_to_registry
+        func: shell
+        do: |
+          echo "Pushing image to container registry..."
+          # In real usage: docker push myregistry.io/app:latest
+          echo "Push complete"
+        retry:
+          max_attempts: 5
+          interval: 1s
+          # JavaScript: all conditions must be true to retry
+          when: |
+            result.exit_code == 2 &&
+            result.output.includes('WARN') &&
+            result.output.includes('temporary')
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: conditional-retry-demo
+│ 📋 Retry only when specific conditions are met
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: retry-on-timeout
+│  💡 Retry network calls only when they time out (exit code 124)
+│
+└─ ⚡ STEP: call_external_api
+   ┌─ 💻 COMMAND: echo "Calling payment gateway..."
+# In real usage: curl --max-time 5 https://api.payment.com/charge
+# Exit code 124 = timeout, 0 = success, other = permanent error
+echo "Request completed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Calling payment gateway...
+        │ Request completed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'retry-on-timeout' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## on error modes
+
+on_error Modes (fail / ignore / warn)
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: on_error Modes (fail / ignore / warn)
+# Controls what happens when a step fails:
+#
+#   fail   - (default) Stop the task immediately
+#   ignore - Silently continue to the next step
+#   warn   - Continue but mark the step with "warning" status
+#
+# Use `steps.<name>.status` and `steps.<name>.error` to inspect
+# the result of warned/ignored steps in subsequent steps.
+#
+# Try: orchstep run graceful-monitoring
+# Try: orchstep run best-effort-cleanup
+
+name: on-error-modes-demo
+desc: "Control error behavior per step: fail, ignore, or warn"
+
+tasks:
+  # -- Default behavior: fail stops the task --
+  strict-pipeline:
+    desc: "Default fail mode - task stops on first error"
+    steps:
+      - name: critical_step
+        func: shell
+        do: |
+          echo "Running critical validation..."
+          # If this fails, the task stops immediately
+          echo "Validation passed"
+
+      - name: next_step
+        func: shell
+        do: |
+          echo "This only runs if the previous step succeeded"
+
+  # -- Ignore mode: continue despite errors --
+  best-effort-cleanup:
+    desc: "Clean up resources, ignoring individual failures"
+    steps:
+      - name: delete_temp_files
+        func: shell
+        do: |
+          echo "Deleting temporary files..."
+          # Even if this fails, continue with other cleanup
+          rm -rf /tmp/orchstep-build-* 2>/dev/null || true
+          echo "Temp files cleaned"
+        on_error: ignore
+
+      - name: remove_containers
+        func: shell
+        do: |
+          echo "Removing stopped containers..."
+          # docker rm $(docker ps -aq --filter status=exited) 2>/dev/null
+          echo "Containers cleaned"
+        on_error: ignore
+
+      - name: cleanup_summary
+        func: shell
+        do: |
+          echo "Cleanup finished (errors were ignored)"
+
+  # -- Warn mode: continue with status tracking --
+  graceful-monitoring:
+    desc: "Monitor multiple services, tracking warnings"
+    steps:
+      - name: check_database
+        func: shell
+        do: |
+          echo "Checking database health..."
+          # In real usage: pg_isready -h db-host
+          echo "Database OK"
+        on_error: warn
+
+      - name: check_cache
+        func: shell
+        do: |
+          echo "Checking cache health..."
+          # In real usage: redis-cli ping
+          echo "Cache OK"
+        on_error: warn
+
+      - name: check_queue
+        func: shell
+        do: |
+          echo "Checking message queue health..."
+          # In real usage: rabbitmqctl status
+          echo "Queue OK"
+        on_error: warn
+
+      - name: report_health
+        func: shell
+        do: |
+          echo "=== Health Check Report ==="
+          echo "Database: {{ steps.check_database.status }}"
+          echo "Cache: {{ steps.check_cache.status }}"
+          echo "Queue: {{ steps.check_queue.status }}"
+
+  # -- Combine on_error with retry --
+  retry-then-warn:
+    desc: "Retry first, then warn if all attempts fail"
+    steps:
+      - name: sync_metrics
+        func: shell
+        do: |
+          echo "Pushing metrics to monitoring service..."
+          # In real usage: curl -X POST http://prometheus/api/v1/write
+          echo "Metrics pushed"
+        retry:
+          max_attempts: 3
+          interval: 500ms
+        on_error: warn    # If all retries fail, warn but continue
+
+      - name: continue_pipeline
+        func: shell
+        do: |
+          echo "Pipeline continues regardless of metrics push"
+          echo "Metrics step status: {{ steps.sync_metrics.status }}"
+
+  # -- on_error with loops --
+  loop-with-warnings:
+    desc: "Process items in a loop, warning on individual failures"
+    steps:
+      - name: process_batch
+        loop:
+          count: 3
+        func: shell
+        do: |
+          echo "Processing item {{ loop.index }}..."
+          # Some items may fail, but we want to process them all
+          echo "Item {{ loop.index }} done"
+        on_error: warn
+
+  # -- Mixed modes in a single workflow --
+  mixed-error-modes:
+    desc: "Different error modes for different step importance"
+    steps:
+      - name: optional_warmup
+        func: shell
+        do: echo "Warming up cache (optional)..."
+        on_error: ignore    # Not critical, skip silently
+
+      - name: advisory_check
+        func: shell
+        do: echo "Running advisory security scan..."
+        on_error: warn      # Want to know, but not blocking
+
+      - name: critical_deploy
+        func: shell
+        do: echo "Deploying to production..."
+        # on_error defaults to "fail" - this MUST succeed
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: on-error-modes-demo
+│ 📋 Control error behavior per step: fail, ignore, or warn
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: strict-pipeline
+│  💡 Default fail mode - task stops on first error
+│
+├─ ⚡ STEP: critical_step
+│  ┌─ 💻 COMMAND: echo "Running critical validation..."
+# If this fails, the task stops immediately
+echo "Validation passed"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Running critical validation...
+│       │ Validation passed
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: next_step
+   ┌─ 💻 COMMAND: echo "This only runs if the previous step succeeded"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ This only runs if the previous step succeeded
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'strict-pipeline' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## retry with jitter
+
+Retry with Exponential Backoff and Jitter
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Retry with Exponential Backoff and Jitter
+# Shows how to prevent "thundering herd" problems by adding
+# random jitter to retry delays.
+#
+# Jitter adds randomness to retry intervals so that multiple
+# clients retrying simultaneously don't all hit the server
+# at the same moment.
+#
+# jitter: 0.0  = no randomness (deterministic delays)
+# jitter: 0.3  = +/-30% variation around the calculated delay
+# jitter: 0.5  = +/-50% variation
+# jitter: 1.0  = +/-100% variation (0 to 2x the delay)
+#
+# Try: orchstep run resilient-deploy
+# Try: orchstep run api-with-backoff
+
+name: retry-with-jitter-demo
+desc: "Resilient retry with jitter to prevent thundering herd"
+
+tasks:
+  # -- Basic jitter for distributed retries --
+  resilient-deploy:
+    desc: "Deploy with jitter to avoid retry storms"
+    steps:
+      - name: deploy_to_cluster
+        func: shell
+        do: |
+          echo "Deploying application to cluster..."
+          # In real usage: kubectl apply -f deployment.yml
+          echo "Deployment successful"
+        retry:
+          max_attempts: 5
+          interval: 2s
+          jitter: 0.3     # +/-30% variation: delays between 1.4s and 2.6s
+
+  # -- Exponential backoff with jitter --
+  api-with-backoff:
+    desc: "API calls with exponential backoff and jitter"
+    steps:
+      - name: call_rate_limited_api
+        func: shell
+        do: |
+          echo "Calling rate-limited API..."
+          # In real usage: curl https://api.example.com/data
+          echo "Response received"
+        retry:
+          max_attempts: 5
+          interval: 100ms
+          backoff_rate: 2.0    # Double the delay each time
+          jitter: 0.3          # +/-30% jitter on each backoff delay
+          # Approximate delays:
+          # Attempt 1->2: ~100ms  (70ms  - 130ms)
+          # Attempt 2->3: ~200ms  (140ms - 260ms)
+          # Attempt 3->4: ~400ms  (280ms - 520ms)
+          # Attempt 4->5: ~800ms  (560ms - 1040ms)
+
+  # -- Jitter with max delay cap --
+  capped-backoff:
+    desc: "Backoff with jitter capped at a maximum delay"
+    steps:
+      - name: sync_to_remote
+        func: shell
+        do: |
+          echo "Syncing data to remote storage..."
+          # In real usage: aws s3 sync ./data s3://bucket/
+          echo "Sync complete"
+        retry:
+          max_attempts: 5
+          interval: 100ms
+          backoff_rate: 3.0     # Triple each time (aggressive backoff)
+          max_delay: 500ms      # Never wait more than 500ms
+          jitter: 0.5           # +/-50% on the capped delay
+          # Delays: 100ms, 300ms, 500ms (capped), 500ms (capped)
+          # With jitter: varies +/-50% around each value
+
+  # -- High jitter for maximum spread --
+  distributed-workers:
+    desc: "Maximum jitter spread for distributed worker retries"
+    steps:
+      - name: acquire_lock
+        func: shell
+        do: |
+          echo "Acquiring distributed lock..."
+          # In real usage: redis SET lock NX EX 30
+          echo "Lock acquired"
+        retry:
+          max_attempts: 4
+          interval: 200ms
+          jitter: 1.0     # +/-100%: delays between 0ms and 400ms
+          # Maximum spread prevents multiple workers from colliding
+
+  # -- Multiple steps with independent jitter --
+  parallel-service-calls:
+    desc: "Each step retries with its own jitter pattern"
+    steps:
+      - name: call_auth_service
+        func: shell
+        do: echo "Authenticating with auth service..."
+        retry:
+          max_attempts: 3
+          interval: 100ms
+          jitter: 0.3
+        on_error: warn
+
+      - name: call_data_service
+        func: shell
+        do: echo "Fetching data from data service..."
+        retry:
+          max_attempts: 3
+          interval: 200ms
+          jitter: 0.5
+        on_error: warn
+
+      - name: aggregate_results
+        func: shell
+        do: |
+          echo "Aggregating service responses..."
+          echo "Auth status: {{ steps.call_auth_service.status }}"
+          echo "Data status: {{ steps.call_data_service.status }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: retry-with-jitter-demo
+│ 📋 Resilient retry with jitter to prevent thundering herd
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: resilient-deploy
+│  💡 Deploy with jitter to avoid retry storms
+│
+└─ ⚡ STEP: deploy_to_cluster
+   ┌─ 💻 COMMAND: echo "Deploying application to cluster..."
+# In real usage: kubectl apply -f deployment.yml
+echo "Deployment successful"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying application to cluster...
+        │ Deployment successful
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'resilient-deploy' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## timeout management
+
+Timeout Management
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Timeout Management
+# Shows how to set time limits on step execution and combine
+# timeouts with retry for resilient operations.
+#
+# Supported duration formats: 500ms, 2s, 1m, 5m
+# Timeout exit code: 124 (can be used in retry conditions)
+#
+# Try: orchstep run api-call-with-timeout
+# Try: orchstep run timeout-with-retry
+
+name: timeout-management-demo
+desc: "Control step execution time with timeouts"
+
+tasks:
+  # -- Basic timeout on a step --
+  api-call-with-timeout:
+    desc: "Prevent API calls from hanging indefinitely"
+    steps:
+      - name: fetch_user_data
+        func: shell
+        do: |
+          echo "Fetching user data from API..."
+          # In real usage: curl --max-time 5 https://api.example.com/users
+          sleep 0.5
+          echo "Data received"
+        timeout: 5s    # Kill step if it takes longer than 5 seconds
+
+      - name: process_results
+        func: shell
+        do: |
+          echo "Processing user data..."
+          echo "Done"
+
+  # -- Different timeout formats --
+  timeout-formats:
+    desc: "Demonstrate different duration format options"
+    steps:
+      - name: quick_check
+        func: shell
+        do: echo "Fast operation"
+        timeout: 500ms    # Milliseconds
+
+      - name: moderate_task
+        func: shell
+        do: echo "Medium operation"
+        timeout: 10s      # Seconds
+
+      - name: long_running_job
+        func: shell
+        do: echo "Long operation"
+        timeout: 5m       # Minutes
+
+  # -- Timeout combined with retry --
+  timeout-with-retry:
+    desc: "Retry operations that time out, with per-attempt timeout"
+    steps:
+      - name: wait_for_service
+        func: shell
+        do: |
+          echo "Waiting for service to become ready..."
+          # In real usage: curl http://service:8080/ready
+          # Each attempt has its own 2-second timeout window
+          sleep 0.5
+          echo "Service is ready"
+        timeout: 2s       # Each attempt gets 2 seconds max
+        retry:
+          max_attempts: 4
+          interval: 1s
+        outputs:
+          status: "{{ result.output }}"
+
+  # -- Retry only on timeout (not other errors) --
+  selective-timeout-retry:
+    desc: "Retry on timeout but fail fast on other errors"
+    steps:
+      - name: deploy_and_wait
+        func: shell
+        do: |
+          echo "Deploying and waiting for rollout..."
+          # In real usage: kubectl rollout status deployment/app
+          echo "Rollout complete"
+        timeout: 30s
+        retry:
+          max_attempts: 3
+          interval: 5s
+          # Exit code 124 = timeout. Only retry timeouts.
+          when: |
+            result.exit_code == 124
+
+  # -- Timeout with error handling --
+  timeout-with-catch:
+    desc: "Handle timeout failures gracefully"
+    steps:
+      - name: long_running_report
+        func: shell
+        do: |
+          echo "Generating quarterly report..."
+          # In real usage: complex data aggregation query
+          sleep 0.5
+          echo "Report generated"
+        timeout: 5s
+        catch:
+          - name: handle_report_timeout
+            func: shell
+            do: |
+              echo "Report generation timed out"
+              echo "Scheduling async report job instead..."
+              echo "Exit code: {{ vars.error.exit_code }}"
+              # In real usage: enqueue background job
+        finally:
+          - name: notify_status
+            func: shell
+            do: |
+              echo "Sending status notification..."
+              echo "Report task completed"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: timeout-management-demo
+│ 📋 Control step execution time with timeouts
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: api-call-with-timeout
+│  💡 Prevent API calls from hanging indefinitely
+│
+├─ ⚡ STEP: fetch_user_data
+│  ┌─ 💻 COMMAND: echo "Fetching user data from API..."
+# In real usage: curl --max-time 5 https://api.example.com/users
+sleep 0.5
+echo "Data received"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Fetching user data from API...
+│       │ Data received
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: process_results
+   ┌─ 💻 COMMAND: echo "Processing user data..."
+echo "Done"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Processing user data...
+        │ Done
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'api-call-with-timeout' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## try catch finally
+
+Try / Catch / Finally Error Handling
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Try / Catch / Finally Error Handling
+# Shows the full error handling chain: retry -> catch -> finally.
+#
+# - catch: runs when a step fails (after retries are exhausted)
+# - finally: always runs, whether the step succeeded or failed
+# - catch + finally can be combined for robust error recovery
+#
+# The error context (vars.error) provides: step_name, exit_code,
+# output, message, timestamp, and attempt count.
+#
+# Try: orchstep run deploy-pipeline
+# Try: orchstep run database-migration
+# Try: orchstep run full-error-chain
+
+name: try-catch-finally-demo
+desc: "Robust error handling with catch and finally blocks"
+
+tasks:
+  # -- Catch block for error recovery --
+  deploy-pipeline:
+    desc: "Deploy with rollback on failure"
+    steps:
+      - name: deploy_to_production
+        func: shell
+        do: |
+          echo "Deploying v2.5.0 to production cluster..."
+          # In real usage: kubectl apply -f manifests/
+          echo "Deployment applied"
+        catch:
+          # Catch runs if deploy_to_production fails
+          - name: rollback_deployment
+            func: shell
+            do: |
+              echo "Deployment failed! Rolling back..."
+              echo "Error: {{ vars.error.message }}"
+              echo "Failed step: {{ vars.error.step_name }}"
+              # In real usage: kubectl rollout undo deployment/app
+              echo "Rollback complete"
+
+          - name: notify_team
+            func: shell
+            do: |
+              echo "Sending failure notification..."
+              echo "Exit code was: {{ vars.error.exit_code }}"
+              # In real usage: curl -X POST slack-webhook-url
+
+      # This step runs if deploy succeeded or catch recovered
+      - name: verify_deployment
+        func: shell
+        do: |
+          echo "Running smoke tests..."
+          echo "All checks passed"
+
+  # -- Finally block for guaranteed cleanup --
+  database-migration:
+    desc: "Database migration with guaranteed cleanup"
+    steps:
+      - name: run_migration
+        func: shell
+        do: |
+          echo "Acquiring migration lock..."
+          echo "Running schema changes..."
+          # In real usage: flyway migrate -url=jdbc:postgresql://db:5432/app
+          echo "Migration complete"
+        finally:
+          # Finally ALWAYS runs - success or failure
+          - name: release_lock
+            func: shell
+            do: |
+              echo "Releasing migration lock..."
+              # In real usage: release distributed lock
+              echo "Lock released"
+
+          - name: log_completion
+            func: shell
+            do: |
+              echo "Logging migration result..."
+              # Check if there was an error
+              echo "Error context: {{ vars.error | default \"none\" }}"
+
+  # -- Full chain: retry + catch + finally --
+  full-error-chain:
+    desc: "Complete error handling: retry, catch, and finally combined"
+    steps:
+      - name: sync_data
+        func: shell
+        do: |
+          echo "Syncing data to backup region..."
+          # In real usage: aws s3 sync or rsync
+          echo "Sync complete"
+        # 1. First, retry on transient failures
+        retry:
+          max_attempts: 3
+          interval: 1s
+        # 2. If all retries fail, catch handles the error
+        catch:
+          - name: log_sync_failure
+            func: shell
+            do: |
+              echo "Data sync failed after retries"
+              echo "Attempts made: {{ vars.error.attempt }}"
+              echo "Last error: {{ vars.error.output }}"
+              # Mark region as degraded instead of failing hard
+              echo "Marking backup region as degraded"
+        # 3. Finally always runs (cleanup, metrics, etc.)
+        finally:
+          - name: report_metrics
+            func: shell
+            do: |
+              echo "Recording sync metrics..."
+              # In real usage: push to Prometheus / Datadog
+              echo "Metrics recorded"
+
+  # -- Conditional retry + catch fallback --
+  conditional-with-catch:
+    desc: "Stop retrying on fatal errors, fall through to catch"
+    steps:
+      - name: connect_to_service
+        func: shell
+        do: |
+          echo "Connecting to external service..."
+          echo "Connection established"
+        retry:
+          max_attempts: 5
+          interval: 500ms
+          # Only retry on transient errors (exit code 1)
+          # Fatal errors (exit code 2+) go straight to catch
+          when: |
+            result.exit_code == 1
+        catch:
+          - name: handle_fatal_error
+            func: shell
+            do: |
+              echo "Fatal error detected: {{ vars.error.output }}"
+              echo "Switching to fallback service..."
+        finally:
+          - name: close_connections
+            func: shell
+            do: |
+              echo "Closing all connections..."
+              echo "Cleanup complete"
+
+  # -- Multi-step workflow with mixed error handling --
+  multi-step-pipeline:
+    desc: "Pipeline where each step has its own error handling"
+    steps:
+      - name: build_artifact
+        func: shell
+        do: |
+          echo "Building application artifact..."
+          echo "Build successful"
+        retry:
+          max_attempts: 3
+          interval: 200ms
+        finally:
+          - name: cleanup_build_cache
+            func: shell
+            do: echo "Clearing build cache..."
+
+      - name: run_tests
+        func: shell
+        do: |
+          echo "Running integration tests..."
+          echo "All tests passed"
+        catch:
+          - name: collect_test_logs
+            func: shell
+            do: echo "Collecting test failure logs..."
+        finally:
+          - name: teardown_test_env
+            func: shell
+            do: echo "Tearing down test environment..."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: try-catch-finally-demo
+│ 📋 Robust error handling with catch and finally blocks
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: deploy-pipeline
+│  💡 Deploy with rollback on failure
+│
+├─ ⚡ STEP: deploy_to_production
+│  ┌─ 💻 COMMAND: echo "Deploying v2.5.0 to production cluster..."
+# In real usage: kubectl apply -f manifests/
+echo "Deployment applied"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying v2.5.0 to production cluster...
+│       │ Deployment applied
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: verify_deployment
+   ┌─ 💻 COMMAND: echo "Running smoke tests..."
+echo "All checks passed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Running smoke tests...
+        │ All checks passed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy-pipeline' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

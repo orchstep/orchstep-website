@@ -1,0 +1,304 @@
+---
+title: "Parallel Execution Examples"
+description: "OrchStep examples for parallel step execution and concurrent health checks"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## parallel uuild
+
+Parallel Step Execution
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Parallel Step Execution
+# Demonstrates: Running multiple steps concurrently using the parallel: block
+#
+# Key concepts:
+#   - Steps inside parallel: run simultaneously
+#   - Each parallel step can produce outputs
+#   - Outputs merge back for subsequent sequential steps
+#   - If any parallel step fails, the block fails
+#
+# Try:
+#   orchstep run build-and-deploy
+#   orchstep run build-and-deploy --var version=3.0.0
+
+name: parallel-build-demo
+desc: "Build frontend and backend in parallel, then deploy"
+
+defaults:
+  version: "2.0.0"
+  environment: staging
+
+tasks:
+  build-and-deploy:
+    desc: "Parallel build followed by sequential deploy"
+    steps:
+      - name: build_all
+        desc: "Build both services in parallel"
+        parallel:
+          - name: build_frontend
+            func: shell
+            do: |
+              echo "Building frontend v{{ vars.version }}..."
+              echo "Compiling TypeScript..."
+              echo "Bundling assets..."
+              echo "FRONTEND_ARTIFACT=frontend-{{ vars.version }}.js"
+            outputs:
+              artifact: '{{ result.output | regexFind "FRONTEND_ARTIFACT=(.+)" }}'
+
+          - name: build_backend
+            func: shell
+            do: |
+              echo "Building backend v{{ vars.version }}..."
+              echo "Compiling Go..."
+              echo "Running unit tests..."
+              echo "BACKEND_ARTIFACT=backend-{{ vars.version }}"
+            outputs:
+              artifact: '{{ result.output | regexFind "BACKEND_ARTIFACT=(.+)" }}'
+
+      - name: deploy
+        desc: "Deploy both artifacts"
+        func: shell
+        do: |
+          echo "Deploying to {{ vars.environment }}..."
+          echo "Frontend: {{ steps.build_frontend.artifact }}"
+          echo "Backend: {{ steps.build_backend.artifact }}"
+          echo "Deploy complete!"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: parallel-build-demo
+│ 📋 Build frontend and backend in parallel, then deploy
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: build-and-deploy
+│  💡 Parallel build followed by sequential deploy
+│
+├─ ⚡ STEP: build_all
+│  📝 Build both services in parallel
+│  Starting parallel execution of 2 steps
+│  ┌─ 💻 COMMAND: echo "Building frontend v2.0.0..."
+echo "Compiling TypeScript..."
+echo "Bundling assets..."
+echo "FRONTEND_ARTIFACT=frontend-2.0.0.js"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│  ┌─ 💻 COMMAND: echo "Building backend v2.0.0..."
+echo "Compiling Go..."
+echo "Running unit tests..."
+echo "BACKEND_ARTIFACT=backend-2.0.0"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Building frontend v2.0.0...
+│       │ Building backend v2.0.0...
+│       │ Compiling TypeScript...
+│       │ Compiling Go...
+│       │ Bundling assets...
+│       │ FRONTEND_ARTIFACT=frontend-2.0.0.js
+│       │ Running unit tests...
+│       │ BACKEND_ARTIFACT=backend-2.0.0
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  Parallel step 'build_frontend' completed successfully
+│  Parallel step 'build_backend' completed successfully
+│  Parallel block completed: 2/2 succeeded
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: deploy
+   📝 Deploy both artifacts
+   ┌─ 💻 COMMAND: echo "Deploying to staging..."
+echo "Frontend: frontend-2.0.0.js"
+echo "Backend: backend-2.0.0"
+echo "Deploy complete!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to staging...
+        │ Frontend: frontend-2.0.0.js
+        │ Backend: backend-2.0.0
+        │ Deploy complete!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'build-and-deploy' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_parallel_build
+    task: build-and-deploy
+    expect:
+      success: true
+      output_contains:
+        - "Building frontend v2.0.0..."
+        - "Compiling TypeScript..."
+        - "Bundling assets..."
+        - "FRONTEND_ARTIFACT=frontend-2.0.0.js"
+        - "Building backend v2.0.0..."
+        - "Compiling Go..."
+        - "Running unit tests..."
+        - "BACKEND_ARTIFACT=backend-2.0.0"
+        - "Deploying to staging..."
+        - "Frontend: frontend-2.0.0.js"
+        - "Backend: backend-2.0.0"
+        - "Deploy complete!"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## parallel health checks
+
+Parallel Health Checks
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Parallel Health Checks
+# Demonstrates: Running multiple health checks simultaneously
+#
+# Key concepts:
+#   - Check multiple services at once instead of sequentially
+#   - Collect results from all parallel steps
+#   - Use assertions to verify all services are healthy
+#
+# Try:
+#   orchstep run check-all
+
+name: parallel-health_checks
+desc: "Check multiple service endpoints in parallel"
+
+defaults:
+  api_url: "https://api.example.com"
+  web_url: "https://www.example.com"
+  admin_url: "https://admin.example.com"
+
+tasks:
+  check-all:
+    desc: "Verify all services are healthy"
+    steps:
+      - name: health_checks
+        desc: "Run all health checks in parallel"
+        parallel:
+          - name: check_api
+            func: shell
+            do: |
+              echo "Checking API at {{ vars.api_url }}..."
+              echo "API_STATUS=healthy"
+            outputs:
+              status: '{{ result.output | regexFind "API_STATUS=(.+)" }}'
+
+          - name: check_web
+            func: shell
+            do: |
+              echo "Checking web at {{ vars.web_url }}..."
+              echo "WEB_STATUS=healthy"
+            outputs:
+              status: '{{ result.output | regexFind "WEB_STATUS=(.+)" }}'
+
+          - name: check_admin
+            func: shell
+            do: |
+              echo "Checking admin at {{ vars.admin_url }}..."
+              echo "ADMIN_STATUS=healthy"
+            outputs:
+              status: '{{ result.output | regexFind "ADMIN_STATUS=(.+)" }}'
+
+      - name: verify_all_healthy
+        func: assert
+        args:
+          condition: 'steps.check_api.status === "healthy" && steps.check_web.status === "healthy" && steps.check_admin.status === "healthy"'
+          desc: "All services must be healthy"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "Health Check Summary:"
+          echo "  API:   {{ steps.check_api.status }}"
+          echo "  Web:   {{ steps.check_web.status }}"
+          echo "  Admin: {{ steps.check_admin.status }}"
+          echo "All services operational!"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: parallel-health_checks
+│ 📋 Check multiple service endpoints in parallel
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: check-all
+│  💡 Verify all services are healthy
+│
+├─ ⚡ STEP: health_checks
+│  📝 Run all health checks in parallel
+│  Starting parallel execution of 3 steps
+│  ┌─ 💻 COMMAND: echo "Checking admin at https://admin.example.com..."
+echo "ADMIN_STATUS=healthy"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│  ┌─ 💻 COMMAND: echo "Checking API at https://api.example.com..."
+echo "API_STATUS=healthy"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│  ┌─ 💻 COMMAND: echo "Checking web at https://www.example.com..."
+echo "WEB_STATUS=healthy"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Checking API at https://api.example.com...
+│       │ API_STATUS=healthy
+│       │ Checking admin at https://admin.example.com...
+│       │ ADMIN_STATUS=healthy
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│       │ Checking web at https://www.example.com...
+│       │ WEB_STATUS=healthy
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  Parallel step 'check_api' completed successfully
+│  Parallel step 'check_web' completed successfully
+│  Parallel step 'check_admin' completed successfully
+│  Parallel block completed: 3/3 succeeded
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: verify_all_healthy
+│  ┌─ 🔍 ASSERTION: steps.check_api.status === "healthy" && steps.check_web.status === "healthy" && steps.check_admin.status === "healthy"
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "Health Check Summary:"
+echo "  API:   healthy"
+echo "  Web:   healthy"
+echo "  Admin: healthy"
+echo "All services operational!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Health Check Summary:
+        │   API:   healthy
+        │   Web:   healthy
+        │   Admin: healthy
+        │ All services operational!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'check-all' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

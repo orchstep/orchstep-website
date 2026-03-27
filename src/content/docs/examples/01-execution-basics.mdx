@@ -1,0 +1,282 @@
+---
+title: "Execution Basics Examples"
+description: "OrchStep examples for basic workflow execution"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## hello world
+
+Hello World
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Hello World
+# The simplest OrchStep workflow -- one task, one step.
+# This is the starting point for learning OrchStep.
+#
+# Try: orchstep run
+
+name: hello-world
+desc: "Your first OrchStep workflow"
+
+tasks:
+  main:
+    desc: "Say hello"
+    steps:
+      - name: greet
+        desc: "Output a greeting using the shell function"
+        func: shell
+        do: echo 'Hello from OrchStep!'
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: hello-world
+│ 📋 Your first OrchStep workflow
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Say hello
+│
+└─ ⚡ STEP: greet
+   📝 Output a greeting using the shell function
+   ┌─ 💻 COMMAND: echo 'Hello from OrchStep!'
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Hello from OrchStep!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_hello_world
+    task: main
+    expect:
+      success: true
+      output_contains:
+        - "Hello from OrchStep!"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## shell commands
+
+Shell Commands
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Shell Commands
+# Shows the two ways to run shell commands in OrchStep:
+#   1. Using "do:" -- the concise shorthand for shell execution
+#   2. Using "args: cmd:" -- the explicit form
+#
+# Both approaches use func: shell under the hood.
+# The "do:" shorthand is recommended for readability.
+#
+# Try: orchstep run
+
+name: shell-commands
+desc: "Different ways to execute shell commands"
+
+tasks:
+  main:
+    desc: "Demonstrate shell command patterns"
+    steps:
+      # Pattern 1: "do:" shorthand (recommended)
+      - name: using_do_shorthand
+        desc: "Run a shell command using 'do:' syntax"
+        func: shell
+        do: "echo 'This uses the do: shorthand'"
+
+      # Pattern 2: "args: cmd:" explicit form
+      - name: using_args_cmd
+        desc: "Run a shell command using explicit 'args: cmd:' syntax"
+        func: shell
+        args:
+          cmd: "echo 'This uses the args:cmd: form'"
+
+      # Pattern 3: Multi-line shell script with "do:"
+      - name: multi_line_script
+        desc: "Run a multi-line shell script"
+        func: shell
+        do: |
+          echo "Step 1: Checking environment..."
+          echo "Step 2: Running build..."
+          echo "Step 3: Build complete!"
+
+      # Pattern 4: Capture output for later steps
+      - name: capture_output
+        desc: "Run a command and capture its output"
+        func: shell
+        do: echo "build-artifact-v1.0.0"
+        outputs:
+          artifact_name: "{{ result.output }}"
+
+      - name: use_captured_output
+        desc: "Reference the captured output from a previous step"
+        func: shell
+        do: echo "Deploying artifact -- {{ steps.capture_output.artifact_name }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: shell-commands
+│ 📋 Different ways to execute shell commands
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Demonstrate shell command patterns
+│
+├─ ⚡ STEP: using_do_shorthand
+│  📝 Run a shell command using 'do:' syntax
+│  ┌─ 💻 COMMAND: echo 'This uses the do: shorthand'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ This uses the do: shorthand
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: using_args_cmd
+│  📝 Run a shell command using explicit 'args: cmd:' syntax
+│  ┌─ 💻 COMMAND: echo 'This uses the args:cmd: form'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ This uses the args:cmd: form
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: multi_line_script
+│  📝 Run a multi-line shell script
+│  ┌─ 💻 COMMAND: echo "Step 1: Checking environment..."
+echo "Step 2: Running build..."
+echo "Step 3: Build complete!"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Step 1: Checking environment...
+│       │ Step 2: Running build...
+│       │ Step 3: Build complete!
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: capture_output
+│  📝 Run a command and capture its output
+│  ┌─ 💻 COMMAND: echo "build-artifact-v1.0.0"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ build-artifact-v1.0.0
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: use_captured_output
+   📝 Reference the captured output from a previous step
+   ┌─ 💻 COMMAND: echo "Deploying artifact -- build-artifact-v1.0.0"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying artifact -- build-artifact-v1.0.0
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## shell with timeout
+
+Shell with Timeout
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Shell with Timeout
+# Shows how to pass additional parameters to shell commands.
+# The "args:" block lets you set options like timeout alongside "do:".
+#
+# Try: orchstep run
+
+name: shell-with-timeout
+desc: "Shell commands with additional parameters"
+
+tasks:
+  main:
+    desc: "Run commands with timeout and other options"
+    steps:
+      - name: quick_command
+        desc: "A fast command with a generous timeout"
+        func: shell
+        do: echo 'This completes well within 30 seconds'
+        args:
+          timeout: 30
+
+      - name: health_check
+        desc: "Simulate a health check with a short timeout"
+        func: shell
+        do: |
+          echo "Checking service health..."
+          echo "Status: healthy"
+        args:
+          timeout: 10
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: shell-with-timeout
+│ 📋 Shell commands with additional parameters
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run commands with timeout and other options
+│
+├─ ⚡ STEP: quick_command
+│  📝 A fast command with a generous timeout
+│  ┌─ 💻 COMMAND: echo 'This completes well within 30 seconds'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ This completes well within 30 seconds
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: health_check
+   📝 Simulate a health check with a short timeout
+   ┌─ 💻 COMMAND: echo "Checking service health..."
+echo "Status: healthy"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Checking service health...
+        │ Status: healthy
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

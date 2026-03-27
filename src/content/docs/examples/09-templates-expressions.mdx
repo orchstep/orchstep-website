@@ -1,0 +1,843 @@
+---
+title: "Templates & Expressions Examples"
+description: "OrchStep examples for Go templates, JavaScript, and data transforms"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## data transform
+
+Data Transform Function
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Data Transform Function
+# The `transform` function executes JavaScript to process,
+# filter, and reshape data within your workflow.
+#
+# Usage:
+#   func: transform
+#   do: |
+#     // JavaScript code
+#     return { key: value };
+#
+# Available context:
+#   vars.*            - Read/write workflow variables
+#   steps.*           - Read outputs from previous steps
+#   utils.parseJSON() - Parse JSON strings
+#   utils.stringifyJSON() - Serialize to JSON
+#   utils.unique()    - Deduplicate an array
+#   utils.sum()       - Sum an array of numbers
+#
+# Return value becomes the step output:
+#   - Object: fields accessible as steps.<name>.<field>
+#   - Primitive/Array: wrapped as steps.<name>.result
+#
+# Try: orchstep run filter-api-data
+# Try: orchstep run compute-metrics
+
+name: data-transform-demo
+desc: "JavaScript transform function for data manipulation"
+
+tasks:
+  # -- Return different types --
+  basic-transforms:
+    desc: "Transform returning primitives, objects, and arrays"
+    steps:
+      - name: return_number
+        func: transform
+        do: |
+          return 42;
+      # Access: steps.return_number.result == 42
+
+      - name: return_string
+        func: transform
+        do: |
+          return "deployment-ready";
+      # Access: steps.return_string.result == "deployment-ready"
+
+      - name: return_object
+        func: transform
+        do: |
+          return {
+            count: 42,
+            status: "success",
+            active: true
+          };
+      # Access: steps.return_object.count, steps.return_object.status
+
+      - name: return_array
+        func: transform
+        do: |
+          return [1, 2, 3, 4, 5];
+      # Access: steps.return_array.result.length == 5
+
+      - name: verify
+        func: shell
+        do: |
+          echo "Number: {{ steps.return_number.result }}"
+          echo "Object status: {{ steps.return_object.status }}"
+
+  # -- Access and modify variables --
+  compute-metrics:
+    desc: "Read variables and compute derived values"
+    vars:
+      input_value: 100
+      multiplier: 2
+      counter: 0
+    steps:
+      - name: calculate
+        func: transform
+        do: |
+          const input = vars.input_value;
+          const mult = vars.multiplier;
+          return { result: input * mult };
+
+      - name: increment_counter
+        func: transform
+        do: |
+          // Transform can modify task-level variables
+          vars.counter = vars.counter + 1;
+          return { incremented: true };
+
+      - name: read_counter
+        func: transform
+        do: |
+          return { counter_value: vars.counter };
+
+      - name: show_results
+        func: shell
+        do: |
+          echo "Computed: {{ steps.calculate.result }}"
+          echo "Counter: {{ steps.read_counter.counter_value }}"
+
+  # -- Filter and reshape API data --
+  filter-api-data:
+    desc: "Parse API response and filter active users"
+    steps:
+      - name: fetch_users
+        func: shell
+        do: |
+          echo '{"users":[{"id":1,"name":"Alice","active":true},{"id":2,"name":"Bob","active":false},{"id":3,"name":"Charlie","active":true}]}'
+
+      - name: process_users
+        func: transform
+        do: |
+          const data = utils.parseJSON(steps.fetch_users.output);
+          const activeUsers = data.users.filter(u => u.active);
+          const names = activeUsers.map(u => u.name);
+
+          return {
+            total_users: data.users.length,
+            active_count: activeUsers.length,
+            active_names: names
+          };
+
+      - name: display_results
+        func: shell
+        do: |
+          echo "Total users: {{ steps.process_users.total_users }}"
+          echo "Active users: {{ steps.process_users.active_count }}"
+
+  # -- Utility functions --
+  utility-functions:
+    desc: "Use built-in utility functions for common operations"
+    steps:
+      - name: json_round_trip
+        func: transform
+        do: |
+          // Serialize and parse JSON
+          const obj = { name: "deployment", version: 42 };
+          const json = utils.stringifyJSON(obj);
+          const parsed = utils.parseJSON(json);
+          return { name: parsed.name, version: parsed.version };
+
+      - name: array_operations
+        func: transform
+        do: |
+          // Deduplicate and sum
+          const arr = [1, 2, 2, 3, 3, 3];
+          const unique = utils.unique(arr);
+          const total = utils.sum(unique);
+          return {
+            original_count: arr.length,
+            unique_count: unique.length,
+            sum: total
+          };
+
+      - name: show_results
+        func: shell
+        do: |
+          echo "JSON name: {{ steps.json_round_trip.name }}"
+          echo "Unique values: {{ steps.array_operations.unique_count }}"
+          echo "Sum: {{ steps.array_operations.sum }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: data-transform-demo
+│ 📋 JavaScript transform function for data manipulation
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: basic-transforms
+│  💡 Transform returning primitives, objects, and arrays
+│
+├─ ⚡ STEP: return_number
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: return_string
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: return_object
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: return_array
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: verify
+   ┌─ 💻 COMMAND: echo "Number: 42"
+echo "Object status: success"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Number: 42
+        │ Object status: success
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'basic-transforms' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## dual syntax
+
+Go Templates vs JavaScript Expressions
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Go Templates vs JavaScript Expressions
+# OrchStep auto-detects which syntax you are using:
+#
+#   - Starts with {{ }}  ->  Go Template (Sprig functions)
+#   - Otherwise          ->  JavaScript (Goja engine)
+#
+# Both syntaxes work in assert conditions, retry when clauses,
+# and anywhere expressions are evaluated.
+#
+# Try: orchstep run compare-syntax
+
+name: dual-syntax-demo
+desc: "Side-by-side comparison of Go template and JavaScript"
+
+defaults:
+  environment: "prod"
+  count: 10
+  status: "ok"
+  message: "deployment successful"
+  items:
+    - name: "web-server"
+      cpu: 100
+    - name: "database"
+      cpu: 200
+
+tasks:
+  # -- Same assertions in both syntaxes --
+  compare-syntax:
+    desc: "Equivalent checks in Go template and JavaScript"
+    steps:
+      # === Equality ===
+      - name: go_equality
+        desc: "Go Template: equality check"
+        func: assert
+        args:
+          condition: "{{ eq vars.environment \"prod\" }}"
+          desc: "Environment is prod (Go template)"
+
+      - name: js_equality
+        desc: "JavaScript: equality check"
+        func: assert
+        args:
+          condition: "vars.environment === 'prod'"
+          desc: "Environment is prod (JavaScript)"
+
+      # === Numeric comparison ===
+      - name: go_numeric
+        desc: "Go Template: numeric comparison"
+        func: assert
+        args:
+          condition: "{{ gt vars.count 5 }}"
+          desc: "Count > 5 (Go template)"
+
+      - name: js_numeric
+        desc: "JavaScript: numeric comparison"
+        func: assert
+        args:
+          condition: "vars.count > 5"
+          desc: "Count > 5 (JavaScript)"
+
+      # === String contains ===
+      - name: go_contains
+        desc: "Go Template: string contains"
+        func: assert
+        args:
+          condition: "{{ contains \"successful\" vars.message }}"
+          desc: "Message contains 'successful' (Go template)"
+
+      - name: js_contains
+        desc: "JavaScript: string contains"
+        func: assert
+        args:
+          condition: "vars.message.includes('successful')"
+          desc: "Message contains 'successful' (JavaScript)"
+
+      # === Logical AND ===
+      - name: go_and
+        desc: "Go Template: logical AND"
+        func: assert
+        args:
+          condition: "{{ and (eq vars.status \"ok\") (gt vars.count 5) }}"
+          desc: "Status ok AND count > 5 (Go template)"
+
+      - name: js_and
+        desc: "JavaScript: logical AND"
+        func: assert
+        args:
+          condition: "vars.status === 'ok' && vars.count > 5"
+          desc: "Status ok AND count > 5 (JavaScript)"
+
+      # === Logical OR ===
+      - name: go_or
+        desc: "Go Template: logical OR"
+        func: assert
+        args:
+          condition: "{{ or (eq vars.environment \"prod\") (eq vars.environment \"staging\") }}"
+          desc: "Environment is prod or staging (Go template)"
+
+      - name: js_or
+        desc: "JavaScript: logical OR"
+        func: assert
+        args:
+          condition: "vars.environment === 'prod' || vars.environment === 'staging'"
+          desc: "Environment is prod or staging (JavaScript)"
+
+      # === NOT / Negation ===
+      - name: go_not
+        desc: "Go Template: NOT"
+        func: assert
+        args:
+          condition: "{{ not (eq vars.environment \"dev\") }}"
+          desc: "Environment is not dev (Go template)"
+
+      - name: js_not
+        desc: "JavaScript: NOT"
+        func: assert
+        args:
+          condition: "vars.environment !== 'dev'"
+          desc: "Environment is not dev (JavaScript)"
+
+  # -- JavaScript-only features --
+  javascript-extras:
+    desc: "JavaScript supports array access and complex expressions"
+    steps:
+      - name: array_access
+        desc: "Access array elements by index"
+        func: assert
+        args:
+          condition: "vars.items[0].cpu === 100"
+          desc: "First item CPU is 100"
+
+      - name: array_length
+        desc: "Check array length"
+        func: assert
+        args:
+          condition: "vars.items.length === 2"
+          desc: "Must have exactly 2 items"
+
+      - name: complex_expression
+        desc: "Multi-line JavaScript expression"
+        func: assert
+        args:
+          condition: |
+            vars.count > 5 &&
+            vars.status === 'ok' &&
+            vars.message.includes('successful')
+          desc: "All conditions must be met"
+
+  # -- Quick reference --
+  syntax-summary:
+    desc: "Print a quick reference of both syntaxes"
+    steps:
+      - name: show_reference
+        func: shell
+        do: |
+          echo "=== Syntax Quick Reference ==="
+          echo ""
+          echo "Go Template:"
+          echo '  Equality:     {{ eq vars.x "value" }}'
+          echo '  Greater than: {{ gt vars.n 5 }}'
+          echo '  Contains:     {{ contains "text" vars.s }}'
+          echo '  AND:          {{ and (cond1) (cond2) }}'
+          echo '  OR:           {{ or (cond1) (cond2) }}'
+          echo '  NOT:          {{ not (cond) }}'
+          echo ""
+          echo "JavaScript:"
+          echo "  Equality:     vars.x === 'value'"
+          echo "  Greater than: vars.n > 5"
+          echo "  Contains:     vars.s.includes('text')"
+          echo "  AND:          cond1 && cond2"
+          echo "  OR:           cond1 || cond2"
+          echo "  NOT:          !cond  or  vars.x !== 'value'"
+          echo ""
+          echo "Detection: starts with {{ -> Go Template, otherwise -> JavaScript"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: dual-syntax-demo
+│ 📋 Side-by-side comparison of Go template and JavaScript
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: compare-syntax
+│  💡 Equivalent checks in Go template and JavaScript
+│
+├─ ⚡ STEP: go_equality
+│  📝 Go Template: equality check
+│  ┌─ 🔍 ASSERTION: {{ eq vars.environment "prod" }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: js_equality
+│  📝 JavaScript: equality check
+│  ┌─ 🔍 ASSERTION: vars.environment === 'prod'
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: go_numeric
+│  📝 Go Template: numeric comparison
+│  ┌─ 🔍 ASSERTION: {{ gt vars.count 5 }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: js_numeric
+│  📝 JavaScript: numeric comparison
+│  ┌─ 🔍 ASSERTION: vars.count > 5
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: go_contains
+│  📝 Go Template: string contains
+│  ┌─ 🔍 ASSERTION: {{ contains "successful" vars.message }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: js_contains
+│  📝 JavaScript: string contains
+│  ┌─ 🔍 ASSERTION: vars.message.includes('successful')
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: go_and
+│  📝 Go Template: logical AND
+│  ┌─ 🔍 ASSERTION: {{ and (eq vars.status "ok") (gt vars.count 5) }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: js_and
+│  📝 JavaScript: logical AND
+│  ┌─ 🔍 ASSERTION: vars.status === 'ok' && vars.count > 5
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: go_or
+│  📝 Go Template: logical OR
+│  ┌─ 🔍 ASSERTION: {{ or (eq vars.environment "prod") (eq vars.environment "staging") }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: js_or
+│  📝 JavaScript: logical OR
+│  ┌─ 🔍 ASSERTION: vars.environment === 'prod' || vars.environment === 'staging'
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: go_not
+│  📝 Go Template: NOT
+│  ┌─ 🔍 ASSERTION: {{ not (eq vars.environment "dev") }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: js_not
+   📝 JavaScript: NOT
+   ┌─ 🔍 ASSERTION: vars.environment !== 'dev'
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'compare-syntax' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## go templates
+
+Go Template Syntax
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Go Template Syntax
+# OrchStep supports Go templates with Sprig functions for
+# string manipulation, conditionals, and data formatting.
+#
+# Syntax: {{ expression }}
+#
+# Key features:
+#   - Variable access: {{ vars.name }}, {{ .vars.name }} (legacy dot syntax)
+#   - Step outputs: {{ steps.step_name.output }}
+#   - Environment: {{ env.PATH }}, {{ .env.HOME }}
+#   - Sprig functions: upper, lower, trim, contains, default, etc.
+#   - Conditionals: {{ if }}, {{ else }}, {{ end }}
+#   - Comparisons: eq, ne, gt, lt, and, or, not
+#
+# Try: orchstep run string-operations
+# Try: orchstep run conditional-config
+
+name: go-templates-demo
+desc: "Go template syntax with Sprig functions"
+
+defaults:
+  app_name: "web-api"
+  environment: "production"
+  version: "2.5.0"
+
+tasks:
+  # -- String manipulation with Sprig --
+  string-operations:
+    desc: "Use Sprig functions for string operations"
+    steps:
+      - name: format_strings
+        func: shell
+        do: |
+          echo "App: {{ vars.app_name }}"
+          echo "Uppercase: {{ upper vars.app_name }}"
+          echo "Environment: {{ upper vars.environment }}"
+          echo "Deployment ID: {{ vars.app_name }}-{{ vars.environment }}"
+
+      - name: use_default_values
+        func: shell
+        do: |
+          # default provides a fallback when a value is empty
+          echo "Region: {{ vars.region | default "us-east-1" }}"
+          echo "Timeout: {{ vars.timeout | default "30s" }}"
+
+  # -- Conditionals in templates --
+  conditional-config:
+    desc: "Use if/else for environment-specific configuration"
+    steps:
+      - name: configure_for_env
+        func: shell
+        do: |
+          echo "=== Configuration for {{ vars.environment }} ==="
+          echo "Log level: {{ if eq vars.environment "production" }}error{{ else }}debug{{ end }}"
+          echo "Replicas: {{ if eq vars.environment "production" }}3{{ else }}1{{ end }}"
+          echo "Debug: {{ if ne vars.environment "production" }}true{{ else }}false{{ end }}"
+
+  # -- Variable interpolation patterns --
+  variable-patterns:
+    desc: "Different ways to access variables in templates"
+    vars:
+      deployment_id: "{{ vars.app_name }}-{{ vars.environment }}"
+      config_path: "/etc/{{ vars.app_name }}/config.yml"
+    steps:
+      - name: setup_environment
+        func: shell
+        do: |
+          echo "Setting up {{ vars.app_name }} version {{ vars.version }}"
+          echo "Config: {{ vars.config_path }}"
+          echo "Deployment: {{ vars.deployment_id }}"
+        outputs:
+          status: "ready"
+          app_url: "https://{{ vars.app_name }}.{{ vars.environment }}.example.com"
+
+      - name: deploy_application
+        func: shell
+        do: |
+          echo "Deploying to {{ steps.setup_environment.app_url }}"
+          echo "Status: {{ steps.setup_environment.status }}"
+
+  # -- Legacy dot syntax (still supported) --
+  legacy-dot-syntax:
+    desc: "The .vars, .env, .steps prefix syntax still works"
+    steps:
+      - name: legacy_example
+        func: shell
+        do: |
+          # Both forms are equivalent:
+          echo "New syntax: {{ vars.app_name }}"
+          echo "Dot syntax: {{ .vars.app_name }}"
+          echo "Env access: {{ .env.HOME }}"
+        outputs:
+          # Check if an env var exists
+          has_home: "{{ if .env.HOME }}true{{ else }}false{{ end }}"
+
+  # -- Assertions with Go template syntax --
+  template-assertions:
+    desc: "Use Go templates in assert conditions"
+    steps:
+      - name: check_equality
+        func: assert
+        args:
+          condition: "{{ eq vars.environment \"production\" }}"
+          desc: "Environment must be production"
+
+      - name: check_comparison
+        func: assert
+        args:
+          condition: "{{ and (eq vars.app_name \"web-api\") (ne vars.environment \"dev\") }}"
+          desc: "Must be web-api and not dev"
+
+      - name: check_contains
+        func: assert
+        args:
+          condition: "{{ contains \"2.5\" vars.version }}"
+          desc: "Version must include 2.5"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: go-templates-demo
+│ 📋 Go template syntax with Sprig functions
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: template-assertions
+│  💡 Use Go templates in assert conditions
+│
+├─ ⚡ STEP: check_equality
+│  ┌─ 🔍 ASSERTION: {{ eq vars.environment "production" }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: check_comparison
+│  ┌─ 🔍 ASSERTION: {{ and (eq vars.app_name "web-api") (ne vars.environment "dev") }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: check_contains
+   ┌─ 🔍 ASSERTION: {{ contains "2.5" vars.version }}
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'template-assertions' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## template files
+
+External Template File Inclusion
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: External Template File Inclusion
+# Use `templateFile` to load and render external template files
+# within your workflow. Great for generating Kubernetes manifests,
+# config files, or any structured output.
+#
+# Syntax: {{ templateFile "path/to/template.tpl" }}
+#
+# Template files:
+#   - Are relative to the workflow directory
+#   - Have full access to vars, steps, env context
+#   - Support Sprig functions (upper, lower, default, etc.)
+#   - Can include other templates (nested inclusion)
+#   - Path traversal (..) is blocked for security
+#
+# This example includes template files in the templates/ subdirectory.
+# See: templates/greeting.tpl, templates/k8s-deployment.tpl,
+#      templates/k8s-metadata.tpl
+#
+# Try: orchstep run generate-greeting
+# Try: orchstep run generate-k8s-manifest
+
+name: template-files-demo
+desc: "External template file inclusion for config generation"
+
+defaults:
+  name: "Alice"
+  app_name: "payment-service"
+  environment: "production"
+  namespace: "prod-ns"
+  replicas: 3
+  image: "myregistry.io/payment-service"
+  tag: "v2.1.0"
+
+tasks:
+  # -- Basic template file loading --
+  generate-greeting:
+    desc: "Render a simple template file with variables"
+    steps:
+      - name: render_greeting
+        func: shell
+        do: |
+          mkdir -p output
+          cat > output/greeting.txt <<'EOF'
+          {{ templateFile "templates/greeting.tpl" }}
+          EOF
+          cat output/greeting.txt
+        outputs:
+          greeting: "{{ result.output }}"
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "Generated greeting:"
+          echo "{{ steps.render_greeting.greeting }}"
+
+  # -- Nested template inclusion (Kubernetes manifests) --
+  generate-k8s-manifest:
+    desc: "Generate a K8s deployment manifest with nested templates"
+    steps:
+      - name: render_deployment
+        func: shell
+        do: |
+          mkdir -p output
+          cat > output/deployment.yaml <<'EOF'
+          {{ templateFile "templates/k8s-deployment.tpl" }}
+          EOF
+          cat output/deployment.yaml
+        outputs:
+          manifest: "{{ result.output }}"
+
+      - name: show_manifest
+        func: shell
+        do: |
+          echo "=== Generated Kubernetes Manifest ==="
+          echo "{{ steps.render_deployment.manifest }}"
+
+  # -- Template with step context --
+  generate-build-info:
+    desc: "Use step outputs inside templates"
+    steps:
+      - name: get_build_id
+        func: shell
+        do: echo "build-$(date +%Y%m%d)-42"
+        outputs:
+          build_id: "{{ result.output | trim }}"
+
+      - name: create_build_info
+        func: shell
+        do: |
+          mkdir -p output
+          cat > output/build-info.txt <<'EOF'
+          Build ID: {{ steps.get_build_id.build_id }}
+          App: {{ vars.app_name }}
+          Image: {{ vars.image }}:{{ vars.tag }}
+          Environment: {{ upper vars.environment }}
+          EOF
+          cat output/build-info.txt
+        outputs:
+          info: "{{ result.output }}"
+
+  # -- Load template into a variable --
+  template-to-variable:
+    desc: "Render a template file and store in a variable"
+    steps:
+      - name: load_template
+        func: shell
+        do: echo "Template loaded"
+        outputs:
+          # Render the template and capture the output
+          rendered: '{{ templateFile "templates/greeting.tpl" }}'
+
+      - name: use_rendered
+        func: shell
+        do: |
+          echo "Rendered template content:"
+          echo "{{ steps.load_template.rendered }}"
+
+  # -- Cleanup --
+  cleanup:
+    desc: "Remove generated output files"
+    steps:
+      - name: remove_output
+        func: shell
+        do: |
+          rm -rf output
+          echo "Output files removed"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: template-files-demo
+│ 📋 External template file inclusion for config generation
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: generate-greeting
+│  💡 Render a simple template file with variables
+│
+├─ ⚡ STEP: render_greeting
+│  ┌─ 💻 COMMAND: mkdir -p output
+cat > output/greeting.txt <<'EOF'
+Hello Alice!
+Welcome to payment-service.
+Environment: PRODUCTION
+
+EOF
+cat output/greeting.txt
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Hello Alice!
+│       │ Welcome to payment-service.
+│       │ Environment: PRODUCTION
+│       │ 
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_result
+   ┌─ 💻 COMMAND: echo "Generated greeting:"
+echo "Hello Alice!
+Welcome to payment-service.
+Environment: PRODUCTION"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Generated greeting:
+        │ Hello Alice!
+        │ Welcome to payment-service.
+        │ Environment: PRODUCTION
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'generate-greeting' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

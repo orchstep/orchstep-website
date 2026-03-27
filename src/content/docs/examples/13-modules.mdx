@@ -1,0 +1,1005 @@
+---
+title: "Modules Examples"
+description: "OrchStep examples for module usage, config, overrides, and nesting"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## uasic module
+
+Basic Module Usage
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Basic Module Usage
+# Import a reusable module and call its tasks from your workflow.
+#
+# Any directory with an orchstep.yml can be used as a module -- no
+# special metadata file is required (implicit module). You reference
+# a module by giving it a name and a source path.
+#
+# Then call its tasks with `module: <name>` and `task: <task>`.
+#
+# Try: orchstep run
+
+name: basic-module-demo
+desc: "Simple module usage with implicit modules"
+
+# Import the greeting module from a local directory
+modules:
+  - name: greeter
+    source: "./modules/greeting"
+    # No config needed -- uses the module's defaults
+
+tasks:
+  main:
+    desc: "Use the greeting module"
+    steps:
+      # Call the module's "greet" task
+      - name: say_hello
+        module: greeter
+        task: greet
+
+      # Access the module's step outputs
+      - name: show_result
+        func: shell
+        do: |
+          echo "Module returned: {{ steps.say_hello.greeting }}"
+          echo "Recipient was:   {{ steps.say_hello.recipient }}"
+
+      - name: explain
+        func: shell
+        do: |
+          echo ""
+          echo "=== Module Basics ==="
+          echo "1. Create a directory with an orchstep.yml"
+          echo "2. Import it:  modules: [{name: x, source: ./path}]"
+          echo "3. Call tasks:  module: x, task: task_name"
+          echo "4. Read outputs: steps.<step_name>.<output_name>"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📦 Loaded module 'greeter' from './modules/greeting'
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: basic-module-demo
+│ 📋 Simple module usage with implicit modules
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Use the greeting module
+│
+├─ ⚡ STEP: say_hello
+│  ┌─ 🔄 INVOKING SUBTASK: greeter.greet
+   ┌─ 💻 COMMAND: echo "Hello from the greeting module, World!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Hello from the greeting module, World!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'greeter.greet' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: show_result
+│  ┌─ 💻 COMMAND: echo "Module returned: Hello from the greeting module, World!"
+echo "Recipient was:   World"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Module returned: Hello from the greeting module, World!
+│       │ Recipient was:   World
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: explain
+   ┌─ 💻 COMMAND: echo ""
+echo "=== Module Basics ==="
+echo "1. Create a directory with an orchstep.yml"
+echo "2. Import it:  modules: [{name: x, source: ./path}]"
+echo "3. Call tasks:  module: x, task: task_name"
+echo "4. Read outputs: steps.<step_name>.<output_name>"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ === Module Basics ===
+        │ 1. Create a directory with an orchstep.yml
+        │ 2. Import it:  modules: [{name: x, source: ./path}]
+        │ 3. Call tasks:  module: x, task: task_name
+        │ 4. Read outputs: steps.<step_name>.<output_name>
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## module overrides
+
+Module Overrides with `with:`
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Module Overrides with `with:`
+# After setting config at import time, you can further override
+# values for a specific call using `with:`. This is useful when
+# different steps need different settings from the same module.
+#
+# Precedence: with > config > module defaults
+#
+# Try: orchstep run
+
+name: module-overrides-demo
+desc: "Override module defaults with 'with:' for specific calls"
+
+modules:
+  - name: db
+    source: "./modules/database"
+    config:
+      connection:
+        host: "prod-db.example.com"
+        port: 5432
+        pool_size: 50
+      operation:
+        timeout: 60
+        retry: 5
+
+tasks:
+  main:
+    desc: "Show how 'with:' overrides config per call"
+    steps:
+      # Call 1: Use the import-time config as-is
+      - name: normal_query
+        desc: "Normal query uses config values"
+        module: db
+        task: query
+        # pool_size=50, timeout=60 (from config)
+
+      # Call 2: Override specific values for this call only
+      - name: lightweight_query
+        desc: "Quick query with reduced pool and timeout"
+        module: db
+        task: query
+        with:
+          connection:
+            pool_size: 5         # Override for this call only
+          operation:
+            timeout: 10          # Fast timeout for quick queries
+
+      # Call 3: Back to normal -- 'with' does not persist
+      - name: another_normal_query
+        desc: "Back to config defaults (with does not persist)"
+        module: db
+        task: query
+
+      - name: compare
+        func: shell
+        do: |
+          echo "=== Override Comparison ==="
+          echo ""
+          echo "Normal query:     pool={{ steps.normal_query.pool }}, timeout={{ steps.normal_query.timeout }}"
+          echo "Lightweight:      pool={{ steps.lightweight_query.pool }}, timeout={{ steps.lightweight_query.timeout }}"
+          echo "Back to normal:   pool={{ steps.another_normal_query.pool }}, timeout={{ steps.another_normal_query.timeout }}"
+          echo ""
+          echo "Precedence: with > config > module defaults"
+          echo "'with:' only affects the step it is on."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📦 Loaded module 'db' from './modules/database'
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: module-overrides-demo
+│ 📋 Override module defaults with 'with:' for specific calls
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Show how 'with:' overrides config per call
+│
+├─ ⚡ STEP: normal_query
+│  📝 Normal query uses config values
+│  ┌─ 🔄 INVOKING SUBTASK: db.query
+   ┌─ 💻 COMMAND: echo "Connecting to prod-db.example.com:5432"
+echo "Pool size: 50"
+echo "Timeout:   60s"
+echo "Retries:   5"
+echo "Query executed successfully"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Connecting to prod-db.example.com:5432
+        │ Pool size: 50
+        │ Timeout:   60s
+        │ Retries:   5
+        │ Query executed successfully
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'db.query' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: lightweight_query
+│  📝 Quick query with reduced pool and timeout
+│  ┌─ 🔄 INVOKING SUBTASK: db.query
+   ┌─ 💻 COMMAND: echo "Connecting to prod-db.example.com:5432"
+echo "Pool size: 5"
+echo "Timeout:   10s"
+echo "Retries:   5"
+echo "Query executed successfully"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Connecting to prod-db.example.com:5432
+        │ Pool size: 5
+        │ Timeout:   10s
+        │ Retries:   5
+        │ Query executed successfully
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'db.query' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: another_normal_query
+│  📝 Back to config defaults (with does not persist)
+│  ┌─ 🔄 INVOKING SUBTASK: db.query
+   ┌─ 💻 COMMAND: echo "Connecting to prod-db.example.com:5432"
+echo "Pool size: 50"
+echo "Timeout:   60s"
+echo "Retries:   5"
+echo "Query executed successfully"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Connecting to prod-db.example.com:5432
+        │ Pool size: 50
+        │ Timeout:   60s
+        │ Retries:   5
+        │ Query executed successfully
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'db.query' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: compare
+   ┌─ 💻 COMMAND: echo "=== Override Comparison ==="
+echo ""
+echo "Normal query:     pool=50, timeout=60"
+echo "Lightweight:      pool=5, timeout=10"
+echo "Back to normal:   pool=50, timeout=60"
+echo ""
+echo "Precedence: with > config > module defaults"
+echo "'with:' only affects the step it is on."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Override Comparison ===
+        │ 
+        │ Normal query:     pool=50, timeout=60
+        │ Lightweight:      pool=5, timeout=10
+        │ Back to normal:   pool=50, timeout=60
+        │ 
+        │ Precedence: with > config > module defaults
+        │ 'with:' only affects the step it is on.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## module variaule scoping
+
+Module Variable Scoping
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Module Variable Scoping
+# Modules are scope-isolated: they cannot see the consumer's variables
+# and the consumer cannot see the module's internal variables.
+#
+# Data flows into a module through `config:` and `with:`.
+# Data flows out through step outputs.
+#
+# If both the consumer and a module define the same variable name,
+# each sees its own value -- no collision.
+#
+# Try: orchstep run
+
+name: module-variable-scoping
+desc: "How variables resolve in modules -- scope isolation"
+
+defaults:
+  app_name: "consumer-app"
+  region: "us-east-1"
+
+modules:
+  - name: greeter
+    source: "./modules/greeting"
+    config:
+      # These values are visible inside the module
+      message: "Hello from config"
+      recipient: "Production Team"
+
+tasks:
+  main:
+    desc: "Demonstrate scope isolation between consumer and module"
+    steps:
+      # Consumer sees its own variables
+      - name: consumer_vars
+        desc: "Consumer's own variables"
+        func: shell
+        do: |
+          echo "=== Consumer Scope ==="
+          echo "app_name = {{ vars.app_name }}"
+          echo "region   = {{ vars.region }}"
+
+      # Module sees config values, not consumer variables
+      - name: module_call
+        desc: "Module sees config values, not consumer vars"
+        module: greeter
+        task: greet
+
+      # Consumer can read module outputs but not module internals
+      - name: read_outputs
+        desc: "Consumer reads module outputs"
+        func: shell
+        do: |
+          echo "=== Module Outputs ==="
+          echo "greeting  = {{ steps.module_call.greeting }}"
+          echo "recipient = {{ steps.module_call.recipient }}"
+
+      # Override for a specific call
+      - name: module_with_override
+        desc: "Use 'with:' to override for this call"
+        module: greeter
+        task: greet
+        with:
+          message: "Overridden greeting"
+          recipient: "Staging Team"
+
+      - name: show_override
+        func: shell
+        do: |
+          echo "=== With Override ==="
+          echo "greeting = {{ steps.module_with_override.greeting }}"
+
+      - name: summary
+        func: shell
+        do: |
+          echo ""
+          echo "=== Variable Scoping Rules ==="
+          echo "  1. Module cannot see consumer variables"
+          echo "  2. Consumer cannot see module internal variables"
+          echo "  3. Data in:  config: and with:"
+          echo "  4. Data out: step outputs"
+          echo "  5. Same variable name in consumer and module = no collision"
+          echo ""
+          echo "  Precedence inside module:"
+          echo "    with > config > task vars > module defaults"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📦 Loaded module 'greeter' from './modules/greeting'
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: module-variable-scoping
+│ 📋 How variables resolve in modules -- scope isolation
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Demonstrate scope isolation between consumer and module
+│
+├─ ⚡ STEP: consumer_vars
+│  📝 Consumer's own variables
+│  ┌─ 💻 COMMAND: echo "=== Consumer Scope ==="
+echo "app_name = consumer-app"
+echo "region   = us-east-1"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Consumer Scope ===
+│       │ app_name = consumer-app
+│       │ region   = us-east-1
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: module_call
+│  📝 Module sees config values, not consumer vars
+│  ┌─ 🔄 INVOKING SUBTASK: greeter.greet
+   ┌─ 💻 COMMAND: echo "Hello from config, Production Team!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Hello from config, Production Team!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'greeter.greet' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: read_outputs
+│  📝 Consumer reads module outputs
+│  ┌─ 💻 COMMAND: echo "=== Module Outputs ==="
+echo "greeting  = Hello from config, Production Team!"
+echo "recipient = Production Team"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Module Outputs ===
+│       │ greeting  = Hello from config, Production Team!
+│       │ recipient = Production Team
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: module_with_override
+│  📝 Use 'with:' to override for this call
+│  ┌─ 🔄 INVOKING SUBTASK: greeter.greet
+   ┌─ 💻 COMMAND: echo "Overridden greeting, Staging Team!"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Overridden greeting, Staging Team!
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'greeter.greet' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: show_override
+│  ┌─ 💻 COMMAND: echo "=== With Override ==="
+echo "greeting = Overridden greeting, Staging Team!"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === With Override ===
+│       │ greeting = Overridden greeting, Staging Team!
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo ""
+echo "=== Variable Scoping Rules ==="
+echo "  1. Module cannot see consumer variables"
+echo "  2. Consumer cannot see module internal variables"
+echo "  3. Data in:  config: and with:"
+echo "  4. Data out: step outputs"
+echo "  5. Same variable name in consumer and module = no collision"
+echo ""
+echo "  Precedence inside module:"
+echo "    with > config > task vars > module defaults"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ === Variable Scoping Rules ===
+        │   1. Module cannot see consumer variables
+        │   2. Consumer cannot see module internal variables
+        │   3. Data in:  config: and with:
+        │   4. Data out: step outputs
+        │   5. Same variable name in consumer and module = no collision
+        │ 
+        │   Precedence inside module:
+        │     with > config > task vars > module defaults
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## module with config
+
+Module Configuration
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Module Configuration
+# When importing a module, pass `config:` to override the module's
+# default variable values. Config is applied at import time and
+# affects all calls to that module.
+#
+# Try: orchstep run
+
+name: module-with-config-demo
+desc: "Module configuration overrides defaults"
+
+# Import the service module with custom configuration
+modules:
+  - name: api
+    source: "./modules/service"
+    config:
+      service:
+        name: "payments-api"
+        port: 9000
+        replicas: 5
+      features:
+        cache: true
+        logging: "debug"
+
+tasks:
+  main:
+    desc: "Deploy and check the configured service"
+    steps:
+      # The module sees our config values, not its defaults
+      - name: deploy_api
+        module: api
+        task: deploy
+
+      - name: check_api
+        module: api
+        task: status
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "Deployed: {{ steps.deploy_api.service_name }}"
+          echo "Port:     {{ steps.deploy_api.service_port }}"
+          echo "Replicas: {{ steps.deploy_api.replicas }}"
+          echo ""
+          echo "=== Module Config ==="
+          echo "Module defaults:  name=default-service, port=8080, replicas=1"
+          echo "Our config:       name=payments-api, port=9000, replicas=5"
+          echo ""
+          echo "Config overrides defaults at import time."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📦 Loaded module 'api' from './modules/service'
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: module-with-config-demo
+│ 📋 Module configuration overrides defaults
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Deploy and check the configured service
+│
+├─ ⚡ STEP: deploy_api
+│  ┌─ 🔄 INVOKING SUBTASK: api.deploy
+   ┌─ 💻 COMMAND: echo "=== Deploying Service ==="
+echo "Name:     payments-api"
+echo "Port:     9000"
+echo "Replicas: 5"
+echo "Cache:    true"
+echo "Logging:  debug"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Deploying Service ===
+        │ Name:     payments-api
+        │ Port:     9000
+        │ Replicas: 5
+        │ Cache:    true
+        │ Logging:  debug
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'api.deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: check_api
+│  ┌─ 🔄 INVOKING SUBTASK: api.status
+   ┌─ 💻 COMMAND: echo "payments-api is running on port 9000"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ payments-api is running on port 9000
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'api.status' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_result
+   ┌─ 💻 COMMAND: echo "Deployed: payments-api"
+echo "Port:     9000"
+echo "Replicas: 5"
+echo ""
+echo "=== Module Config ==="
+echo "Module defaults:  name=default-service, port=8080, replicas=1"
+echo "Our config:       name=payments-api, port=9000, replicas=5"
+echo ""
+echo "Config overrides defaults at import time."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deployed: payments-api
+        │ Port:     9000
+        │ Replicas: 5
+        │ 
+        │ === Module Config ===
+        │ Module defaults:  name=default-service, port=8080, replicas=1
+        │ Our config:       name=payments-api, port=9000, replicas=5
+        │ 
+        │ Config overrides defaults at import time.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## nested modules
+
+Nested Modules
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Nested Modules
+# Modules can import other modules, creating a dependency chain.
+# OrchStep resolves the full chain and executes bottom-up.
+#
+# In this example:
+#   Consumer (this file)
+#     -> app-stack module
+#         -> database module (from the same modules/ directory)
+#
+# Each layer is scope-isolated. Config flows down through imports;
+# outputs flow up through step outputs.
+#
+# Try: orchstep run
+
+name: nested-modules-demo
+desc: "Composing modules that use other modules"
+
+# Import the top-level module (it imports its own dependencies)
+modules:
+  - name: stack
+    source: "./modules/app-stack"
+    config:
+      region: "us-west-2"
+      app_name: "order-service"
+      app_version: "2.1.0"
+
+tasks:
+  main:
+    desc: "Deploy a full application stack through nested modules"
+    steps:
+      # One call triggers the entire chain:
+      # app-stack -> database -> (network if configured)
+      - name: deploy_stack
+        module: stack
+        task: deploy
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "=== Deployment Complete ==="
+          echo "Deployment ID: {{ steps.deploy_stack.deployment_id }}"
+          echo "App URL:       {{ steps.deploy_stack.app_url }}"
+          echo "Status:        {{ steps.deploy_stack.status }}"
+
+      - name: explain
+        func: shell
+        do: |
+          echo ""
+          echo "=== Module Nesting ==="
+          echo "Execution chain:"
+          echo "  1. Consumer calls app-stack.deploy"
+          echo "  2. app-stack calls database.query"
+          echo "  3. Each layer is scope-isolated"
+          echo ""
+          echo "Config flows DOWN through module imports."
+          echo "Outputs flow UP through step outputs."
+          echo ""
+          echo "OrchStep tracks nesting depth and warns if"
+          echo "the chain becomes too deep (> 3 levels)."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📦 Loaded module 'stack' from './modules/app-stack'
+📦 Loaded module 'database' from '../database'
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: nested-modules-demo
+│ 📋 Composing modules that use other modules
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Deploy a full application stack through nested modules
+│
+├─ ⚡ STEP: deploy_stack
+│  ┌─ 🔄 INVOKING SUBTASK: stack.deploy
+│  ┌─ 🔄 INVOKING SUBTASK: database.query
+   ┌─ 💻 COMMAND: echo "Connecting to db-{{ vars.region }}.internal:5432"
+echo "Pool size: 20"
+echo "Timeout:   30s"
+echo "Retries:   3"
+echo "Query executed successfully"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Connecting to db-{{ vars.region }}.internal:5432
+        │ Pool size: 20
+        │ Timeout:   30s
+        │ Retries:   3
+        │ Query executed successfully
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'database.query' COMPLETED
+│  ┌─ 💻 COMMAND: echo "Building order-service:2.1.0"
+echo "Database: db-{{ vars.region }}.internal"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Building order-service:2.1.0
+│       │ Database: db-{{ vars.region }}.internal
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ┌─ 💻 COMMAND: echo "Deploying order-service:2.1.0"
+echo "Region: us-west-2"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying order-service:2.1.0
+        │ Region: us-west-2
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'stack.deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: show_result
+│  ┌─ 💻 COMMAND: echo "=== Deployment Complete ==="
+echo "Deployment ID: deploy-order-service-001"
+echo "App URL:       https://order-service.us-west-2.example.com"
+echo "Status:        deployed"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deployment Complete ===
+│       │ Deployment ID: deploy-order-service-001
+│       │ App URL:       https://order-service.us-west-2.example.com
+│       │ Status:        deployed
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: explain
+   ┌─ 💻 COMMAND: echo ""
+echo "=== Module Nesting ==="
+echo "Execution chain:"
+echo "  1. Consumer calls app-stack.deploy"
+echo "  2. app-stack calls database.query"
+echo "  3. Each layer is scope-isolated"
+echo ""
+echo "Config flows DOWN through module imports."
+echo "Outputs flow UP through step outputs."
+echo ""
+echo "OrchStep tracks nesting depth and warns if"
+echo "the chain becomes too deep (> 3 levels)."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ === Module Nesting ===
+        │ Execution chain:
+        │   1. Consumer calls app-stack.deploy
+        │   2. app-stack calls database.query
+        │   3. Each layer is scope-isolated
+        │ 
+        │ Config flows DOWN through module imports.
+        │ Outputs flow UP through step outputs.
+        │ 
+        │ OrchStep tracks nesting depth and warns if
+        │ the chain becomes too deep (> 3 levels).
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## self contained module
+
+Self-Contained Module
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Self-Contained Module
+# A module can be a single YAML file that contains everything:
+# metadata, config schema, exports, and task implementations.
+#
+# This is ideal for simple, portable modules that you want to
+# share without a directory structure.
+#
+# The module file: modules/deploy.yml
+#
+# Try: orchstep run
+# Try: orchstep run deploy_with_custom_replicas
+
+name: self-contained-module-demo
+desc: "Module with full metadata, exports, and config schema in one file"
+
+# Import a single-file module (direct file reference, not a directory)
+modules:
+  - name: deployer
+    source: "./modules/deploy.yml"
+    config:
+      environment: "staging"
+      registry: "my-registry.example.com"
+
+tasks:
+  # Basic deployment using module defaults
+  deploy_basic:
+    desc: "Deploy with default replicas"
+    steps:
+      - name: deploy_app
+        module: deployer
+        task: deploy
+        with:
+          app_name: "user-service"
+          version: "v2.0.0"
+          # replicas omitted -- uses module default (3)
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "Deployment ID: {{ steps.deploy_app.deployment_id }}"
+          echo "Status:        {{ steps.deploy_app.status }}"
+          echo "Replicas:      {{ steps.deploy_app.replicas }}"
+
+  # Deployment with all params specified
+  deploy_with_custom_replicas:
+    desc: "Deploy with custom replica count"
+    steps:
+      - name: deploy_scaled
+        module: deployer
+        task: deploy
+        with:
+          app_name: "order-service"
+          version: "v3.5.1"
+          replicas: 10
+
+      - name: show_result
+        func: shell
+        do: |
+          echo "App:      {{ steps.deploy_scaled.app_name }}"
+          echo "Version:  {{ steps.deploy_scaled.version }}"
+          echo "Replicas: {{ steps.deploy_scaled.replicas }}"
+
+  main:
+    desc: "Run both deployment scenarios"
+    steps:
+      - name: basic
+        task: deploy_basic
+
+      - name: custom
+        task: deploy_with_custom_replicas
+
+      - name: summary
+        func: shell
+        do: |
+          echo ""
+          echo "=== Self-Contained Modules ==="
+          echo "A single .yml file can contain:"
+          echo "  - metadata:  name, version, author, license"
+          echo "  - config:    schema with validation rules"
+          echo "  - exports:   public task interfaces with params/returns"
+          echo "  - tasks:     the actual implementation"
+          echo ""
+          echo "Import with: source: ./path/to/module.yml"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📦 Loaded module 'deployer' from './modules/deploy.yml'
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: self-contained-module-demo
+│ 📋 Module with full metadata, exports, and config schema in one file
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run both deployment scenarios
+│
+├─ ⚡ STEP: basic
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_basic
+
+┌─ 🎯 TASK: deploy_basic
+│  💡 Deploy with default replicas
+│
+├─ ⚡ STEP: deploy_app
+│  ┌─ 🔄 INVOKING SUBTASK: deployer.deploy
+   ┌─ 💻 COMMAND: echo "Deploying user-service:v2.0.0"
+echo "Environment: staging"
+echo "Registry:    my-registry.example.com"
+echo "Replicas:    3"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying user-service:v2.0.0
+        │ Environment: staging
+        │ Registry:    my-registry.example.com
+        │ Replicas:    3
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'deployer.deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_result
+   ┌─ 💻 COMMAND: echo "Deployment ID: deploy-staging-user-service-001"
+echo "Status:        deployed"
+echo "Replicas:      3"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deployment ID: deploy-staging-user-service-001
+        │ Status:        deployed
+        │ Replicas:      3
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_basic' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_basic' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: custom
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_with_custom_replicas
+
+┌─ 🎯 TASK: deploy_with_custom_replicas
+│  💡 Deploy with custom replica count
+│
+├─ ⚡ STEP: deploy_scaled
+│  ┌─ 🔄 INVOKING SUBTASK: deployer.deploy
+   ┌─ 💻 COMMAND: echo "Deploying order-service:v3.5.1"
+echo "Environment: staging"
+echo "Registry:    my-registry.example.com"
+echo "Replicas:    10"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying order-service:v3.5.1
+        │ Environment: staging
+        │ Registry:    my-registry.example.com
+        │ Replicas:    10
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  └─ ✅ SUBTASK 'deployer.deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_result
+   ┌─ 💻 COMMAND: echo "App:      order-service"
+echo "Version:  v3.5.1"
+echo "Replicas: 10"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ App:      order-service
+        │ Version:  v3.5.1
+        │ Replicas: 10
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_with_custom_replicas' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_with_custom_replicas' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo ""
+echo "=== Self-Contained Modules ==="
+echo "A single .yml file can contain:"
+echo "  - metadata:  name, version, author, license"
+echo "  - config:    schema with validation rules"
+echo "  - exports:   public task interfaces with params/returns"
+echo "  - tasks:     the actual implementation"
+echo ""
+echo "Import with: source: ./path/to/module.yml"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ === Self-Contained Modules ===
+        │ A single .yml file can contain:
+        │   - metadata:  name, version, author, license
+        │   - config:    schema with validation rules
+        │   - exports:   public task interfaces with params/returns
+        │   - tasks:     the actual implementation
+        │ 
+        │ Import with: source: ./path/to/module.yml
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

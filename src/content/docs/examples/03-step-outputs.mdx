@@ -1,0 +1,417 @@
+---
+title: "Step Outputs Examples"
+description: "OrchStep examples for step output extraction and cross-step references"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## auto parse json
+
+Auto-Parse JSON Output
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Auto-Parse JSON Output
+# When a shell command outputs JSON (or YAML), OrchStep automatically
+# detects and parses it. The parsed data is available as "result.data_object".
+#
+# Key concepts:
+#   - result.output    -- raw stdout string (always available)
+#   - result.data_object -- auto-parsed JSON/YAML (when detected)
+#   - Nested field access: result.data_object.metadata.name
+#   - Array access: (index result.data_object.items 0)
+#   - Plain text output: result.data_object is empty, use result.output
+#
+# Try: orchstep run
+
+name: auto-parse-json-demo
+desc: "Automatically parse JSON and YAML from command output"
+
+tasks:
+  main:
+    desc: "Demonstrate auto-parsing of structured output"
+    steps:
+      # JSON output is auto-detected and parsed
+      - name: get_api_response
+        desc: "Simulate an API call that returns JSON"
+        func: shell
+        do: |
+          echo '{"message": "Hello World", "code": 200, "data": {"user": "alice", "role": "admin"}}'
+        outputs:
+          message: "{{ result.data_object.message }}"
+          code: "{{ result.data_object.code }}"
+          user: "{{ result.data_object.data.user }}"
+          role: "{{ result.data_object.data.role }}"
+          raw: "{{ result.output }}"
+
+      # Complex nested JSON with arrays
+      - name: get_pod_info
+        desc: "Simulate kubectl output with nested JSON"
+        func: shell
+        do: |
+          echo '{"apiVersion":"v1","kind":"Pod","metadata":{"name":"my-pod","namespace":"default","labels":{"app":"web"}},"spec":{"containers":[{"name":"nginx","image":"nginx:1.21"}]}}'
+        outputs:
+          pod_name: "{{ result.data_object.metadata.name }}"
+          namespace: "{{ result.data_object.metadata.namespace }}"
+          app_label: "{{ result.data_object.metadata.labels.app }}"
+          container_image: "{{ (index result.data_object.spec.containers 0).image }}"
+
+      # YAML output is also auto-detected
+      - name: get_service_config
+        desc: "Simulate a command that returns YAML"
+        func: shell
+        do: |
+          printf 'name: my-service\nversion: 1.2.3\nconfig:\n  enabled: true\n  replicas: 3\n'
+        outputs:
+          service_name: "{{ result.data_object.name }}"
+          version: "{{ result.data_object.version }}"
+          replicas: "{{ result.data_object.config.replicas }}"
+
+      # Plain text still works normally
+      - name: plain_text_output
+        desc: "Non-structured output uses result.output as usual"
+        func: shell
+        do: echo "This is plain text, not JSON or YAML"
+        outputs:
+          text: "{{ result.output }}"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Auto-Parse Results ==="
+          echo "API user:     {{ steps.get_api_response.user }} ({{ steps.get_api_response.role }})"
+          echo "Pod:          {{ steps.get_pod_info.pod_name }} in {{ steps.get_pod_info.namespace }}"
+          echo "Container:    {{ steps.get_pod_info.container_image }}"
+          echo "Service:      {{ steps.get_service_config.service_name }} v{{ steps.get_service_config.version }}"
+          echo "Plain text:   {{ steps.plain_text_output.text }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: auto-parse-json-demo
+│ 📋 Automatically parse JSON and YAML from command output
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Demonstrate auto-parsing of structured output
+│
+├─ ⚡ STEP: get_api_response
+│  📝 Simulate an API call that returns JSON
+│  ┌─ 💻 COMMAND: echo '{"message": "Hello World", "code": 200, "data": {"user": "alice", "role": "admin"}}'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ {"message": "Hello World", "code": 200, "data": {"user": "alice", "role": "admin"}}
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: get_pod_info
+│  📝 Simulate kubectl output with nested JSON
+│  ┌─ 💻 COMMAND: echo '{"apiVersion":"v1","kind":"Pod","metadata":{"name":"my-pod","namespace":"default","labels":{"app":"web"}},"spec":{"containers":[{"name":"nginx","image":"nginx:1.21"}]}}'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ {"apiVersion":"v1","kind":"Pod","metadata":{"name":"my-pod","namespace":"default","labels":{"app":"web"}},"spec":{"containers":[{"name":"nginx","image":"nginx:1.21"}]}}
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: get_service_config
+│  📝 Simulate a command that returns YAML
+│  ┌─ 💻 COMMAND: printf 'name: my-service\nversion: 1.2.3\nconfig:\n  enabled: true\n  replicas: 3\n'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ name: my-service
+│       │ version: 1.2.3
+│       │ config:
+│       │   enabled: true
+│       │   replicas: 3
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: plain_text_output
+│  📝 Non-structured output uses result.output as usual
+│  ┌─ 💻 COMMAND: echo "This is plain text, not JSON or YAML"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ This is plain text, not JSON or YAML
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Auto-Parse Results ==="
+echo "API user:     alice (admin)"
+echo "Pod:          my-pod in default"
+echo "Container:    nginx:1.21"
+echo "Service:      my-service v1.2.3"
+echo "Plain text:   This is plain text, not JSON or YAML"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Auto-Parse Results ===
+        │ API user:     alice (admin)
+        │ Pod:          my-pod in default
+        │ Container:    nginx:1.21
+        │ Service:      my-service v1.2.3
+        │ Plain text:   This is plain text, not JSON or YAML
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## cross step references
+
+Cross-Step References and Nested Outputs
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Cross-Step References and Nested Outputs
+# Shows how outputs flow between steps, including inside conditional blocks.
+#
+# Key concepts:
+#   - Steps inside if/then blocks can produce outputs
+#   - Parent step's "outputs:" can reference inner step outputs
+#   - Inner step outputs are scoped to the conditional block
+#   - To expose inner outputs, map them in the parent step's "outputs:"
+#
+# Try: orchstep run
+# Try: orchstep run --var environment="production"
+
+name: cross-step-references-demo
+desc: "Outputs from conditional branches and nested steps"
+
+defaults:
+  environment: "nonproduction"
+
+tasks:
+  main:
+    desc: "Deploy with conditional region selection"
+    steps:
+      # Outputs from inside a conditional block are exposed
+      # through the parent step's "outputs:" section
+      - name: deploy_config
+        if: '{{ eq vars.environment "nonproduction" }}'
+        then:
+          - name: select_region
+            func: shell
+            do: "echo 'Selected region: us-west-2 (nonproduction)'"
+            outputs:
+              region: "us-west-2"
+          - name: configure_cluster
+            func: shell
+            do: |
+              echo "Configuring cluster in {{ steps.select_region.region }}"
+            outputs:
+              cluster: "nonprod-{{ steps.select_region.region }}"
+        else:
+          - name: select_region
+            func: shell
+            do: "echo 'Selected region: us-east-1 (production)'"
+            outputs:
+              region: "us-east-1"
+          - name: configure_cluster
+            func: shell
+            do: |
+              echo "Configuring cluster in {{ steps.select_region.region }}"
+            outputs:
+              cluster: "prod-{{ steps.select_region.region }}"
+        outputs:
+          target_region: "{{ steps.configure_cluster.cluster }}"
+
+      # Reference the conditional step's output
+      - name: deploy_application
+        func: shell
+        do: |
+          echo "Deploying to cluster: {{ steps.deploy_config.target_region }}"
+          echo "Environment: {{ vars.environment }}"
+        outputs:
+          deployment_target: "{{ steps.deploy_config.target_region }}"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Deployment Complete ==="
+          echo "Environment: {{ vars.environment }}"
+          echo "Target:      {{ steps.deploy_application.deployment_target }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: cross-step-references-demo
+│ 📋 Outputs from conditional branches and nested steps
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Deploy with conditional region selection
+│
+├─ ⚡ STEP: deploy_config
+│  ┌─ 💻 COMMAND: echo 'Selected region: us-west-2 (nonproduction)'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Selected region: us-west-2 (nonproduction)
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ┌─ 💻 COMMAND: echo "Configuring cluster in us-west-2"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Configuring cluster in us-west-2
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_application
+│  ┌─ 💻 COMMAND: echo "Deploying to cluster: nonprod-us-west-2"
+echo "Environment: nonproduction"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying to cluster: nonprod-us-west-2
+│       │ Environment: nonproduction
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Deployment Complete ==="
+echo "Environment: nonproduction"
+echo "Target:      nonprod-us-west-2"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Deployment Complete ===
+        │ Environment: nonproduction
+        │ Target:      nonprod-us-west-2
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## output extraction
+
+Output Extraction
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Output Extraction
+# Shows how to extract values from shell command output using
+# template expressions and regex patterns.
+#
+# Key concepts:
+#   - "outputs:" maps named keys to template expressions
+#   - "{{ result.output }}" contains the raw stdout of the step
+#   - regexFind extracts matching substrings from output
+#   - Outputs become accessible as {{ steps.<name>.<key> }}
+#
+# Try: orchstep run
+
+name: output-extraction-demo
+desc: "Extract structured values from shell command output"
+
+tasks:
+  main:
+    desc: "Build and deploy pipeline with output extraction"
+    steps:
+      - name: build_docker_image
+        desc: "Build image and extract tag from output"
+        func: shell
+        do: |
+          echo "Building application..."
+          echo "Built image: web-api:v1.2.3"
+          echo "Build complete."
+        outputs:
+          # Extract the image tag using a regex pattern
+          image_tag: "{{ result.output | regexFind \"web-api:([^\\\\s]+)\" }}"
+
+      - name: deploy_to_cluster
+        desc: "Deploy using the extracted image tag"
+        func: shell
+        do: |
+          echo "Deploying {{ steps.build_docker_image.image_tag }} to production cluster"
+          echo "Deployment status: success"
+        outputs:
+          deployment_status: "success"
+          service_arn: "arn:aws:ecs:us-east-1:123456789:service/production/web-api"
+
+      - name: report
+        desc: "Show deployment results"
+        func: shell
+        do: |
+          echo "=== Deployment Report ==="
+          echo "Image:  {{ steps.build_docker_image.image_tag }}"
+          echo "Status: {{ steps.deploy_to_cluster.deployment_status }}"
+          echo "ARN:    {{ steps.deploy_to_cluster.service_arn }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: output-extraction-demo
+│ 📋 Extract structured values from shell command output
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Build and deploy pipeline with output extraction
+│
+├─ ⚡ STEP: build_docker_image
+│  📝 Build image and extract tag from output
+│  ┌─ 💻 COMMAND: echo "Building application..."
+echo "Built image: web-api:v1.2.3"
+echo "Build complete."
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Building application...
+│       │ Built image: web-api:v1.2.3
+│       │ Build complete.
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_to_cluster
+│  📝 Deploy using the extracted image tag
+│  ┌─ 💻 COMMAND: echo "Deploying v1.2.3 to production cluster"
+echo "Deployment status: success"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deploying v1.2.3 to production cluster
+│       │ Deployment status: success
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: report
+   📝 Show deployment results
+   ┌─ 💻 COMMAND: echo "=== Deployment Report ==="
+echo "Image:  v1.2.3"
+echo "Status: success"
+echo "ARN:    arn:aws:ecs:us-east-1:123456789:service/production/web-api"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Deployment Report ===
+        │ Image:  v1.2.3
+        │ Status: success
+        │ ARN:    arn:aws:ecs:us-east-1:123456789:service/production/web-api
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

@@ -1,0 +1,1059 @@
+---
+title: "Real-World Patterns Examples"
+description: "OrchStep examples for deployment pipelines, incident response, and release automation"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## deploy pipeline
+
+Deploy Pipeline
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Deploy Pipeline
+# A realistic deployment pipeline that combines multiple OrchStep features:
+#   - Variables for configuration
+#   - Shell commands for build and deploy
+#   - HTTP health checks with retry
+#   - Assertions to validate success
+#
+# This is the kind of workflow that replaces a custom deploy script
+# with something readable, retryable, and composable.
+#
+# Try: orchstep run
+# Try: orchstep run --var environment=staging --var version=v2.1.0
+
+name: deploy-pipeline
+desc: "Production deployment pipeline with health checks and validation"
+
+defaults:
+  app_name: "payments-api"
+  version: "v1.0.0"
+  environment: "production"
+  registry: "registry.example.com"
+  replicas: 3
+  health_check_url: "https://payments-api.example.com/health"
+  rollback_on_failure: true
+
+tasks:
+  # --- Step 1: Build ---
+  build:
+    desc: "Build the container image"
+    steps:
+      - name: compile
+        func: shell
+        do: |
+          echo "=== Build Phase ==="
+          echo "Building {{ vars.app_name }}:{{ vars.version }}"
+          echo "Build completed at $(date +%H:%M:%S)"
+        outputs:
+          image_tag: "{{ vars.registry }}/{{ vars.app_name }}:{{ vars.version }}"
+
+      - name: run_tests
+        func: shell
+        do: |
+          echo "Running unit tests..."
+          echo "42 tests passed, 0 failed"
+        outputs:
+          tests_passed: 42
+          tests_failed: 0
+
+      - name: verify_tests
+        func: assert
+        args:
+          conditions:
+            - condition: "steps.run_tests.tests_failed === 0"
+              desc: "No test failures"
+            - condition: "steps.run_tests.tests_passed > 0"
+              desc: "At least one test ran"
+
+      - name: push_image
+        func: shell
+        do: |
+          echo "Pushing {{ steps.compile.image_tag }}"
+          echo "Image pushed successfully"
+
+  # --- Step 2: Deploy ---
+  deploy:
+    desc: "Deploy to the target environment"
+    steps:
+      - name: pre_deploy_check
+        func: shell
+        do: |
+          echo "=== Deploy Phase ==="
+          echo "Environment: {{ vars.environment }}"
+          echo "Replicas:    {{ vars.replicas }}"
+
+      - name: rolling_deploy
+        func: shell
+        do: |
+          echo "Starting rolling deployment..."
+          echo "Scaling {{ vars.app_name }} to {{ vars.replicas }} replicas"
+          echo "Deployment ID: deploy-{{ vars.environment }}-$(date +%s)"
+          echo "All replicas healthy"
+        outputs:
+          deploy_id: "deploy-{{ vars.environment }}-001"
+          status: "deployed"
+
+  # --- Step 3: Verify ---
+  verify:
+    desc: "Health check and validation"
+    steps:
+      # Health check with retry -- real deployments need time to stabilize
+      - name: health_check
+        desc: "Check service health (retries on failure)"
+        func: shell
+        do: |
+          echo "Checking health at {{ vars.health_check_url }}"
+          echo "Status: 200 OK"
+          echo "Response: {\"status\":\"healthy\",\"version\":\"{{ vars.version }}\"}"
+        outputs:
+          http_status: 200
+          response: '{"status":"healthy","version":"{{ vars.version }}"}'
+        retry:
+          max: 5
+          delay: 3
+          backoff: 2
+
+      - name: validate_health
+        func: assert
+        args:
+          conditions:
+            - condition: "steps.health_check.http_status === 200"
+              desc: "Health endpoint returns 200"
+            - condition: '{{ contains "healthy" steps.health_check.response }}'
+              desc: "Service reports healthy status"
+
+      - name: smoke_test
+        func: shell
+        do: |
+          echo "Running smoke tests against {{ vars.environment }}..."
+          echo "POST /api/payments -- 201 Created"
+          echo "GET  /api/payments/1 -- 200 OK"
+          echo "All smoke tests passed"
+
+  # --- Orchestrator ---
+  main:
+    desc: "Run the full deploy pipeline"
+    steps:
+      - name: run_build
+        task: build
+
+      - name: run_deploy
+        task: deploy
+
+      - name: run_verify
+        task: verify
+
+      - name: report
+        func: shell
+        do: |
+          echo ""
+          echo "=========================================="
+          echo "  Deployment Complete"
+          echo "=========================================="
+          echo "  App:         {{ vars.app_name }}"
+          echo "  Version:     {{ vars.version }}"
+          echo "  Environment: {{ vars.environment }}"
+          echo "  Replicas:    {{ vars.replicas }}"
+          echo "=========================================="
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: deploy-pipeline
+│ 📋 Production deployment pipeline with health checks and validation
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run the full deploy pipeline
+│
+├─ ⚡ STEP: run_build
+│  ┌─ 🔄 INVOKING SUBTASK: build
+
+┌─ 🎯 TASK: build
+│  💡 Build the container image
+│
+├─ ⚡ STEP: compile
+│  ┌─ 💻 COMMAND: echo "=== Build Phase ==="
+echo "Building payments-api:v1.0.0"
+echo "Build completed at $(date +%H:%M:%S)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Build Phase ===
+│       │ Building payments-api:v1.0.0
+│       │ Build completed at 19:14:50
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_tests
+│  ┌─ 💻 COMMAND: echo "Running unit tests..."
+echo "42 tests passed, 0 failed"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Running unit tests...
+│       │ 42 tests passed, 0 failed
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: verify_tests
+│  ┌─ 🔍 ASSERTION: steps.run_tests.tests_failed === 0
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: steps.run_tests.tests_passed > 0
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 2 conditions passed
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: push_image
+   ┌─ 💻 COMMAND: echo "Pushing registry.example.com/payments-api:v1.0.0"
+echo "Image pushed successfully"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Pushing registry.example.com/payments-api:v1.0.0
+        │ Image pushed successfully
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'build' COMPLETED
+│  └─ ✅ SUBTASK 'build' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_deploy
+│  ┌─ 🔄 INVOKING SUBTASK: deploy
+
+┌─ 🎯 TASK: deploy
+│  💡 Deploy to the target environment
+│
+├─ ⚡ STEP: pre_deploy_check
+│  ┌─ 💻 COMMAND: echo "=== Deploy Phase ==="
+echo "Environment: production"
+echo "Replicas:    3"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Deploy Phase ===
+│       │ Environment: production
+│       │ Replicas:    3
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: rolling_deploy
+   ┌─ 💻 COMMAND: echo "Starting rolling deployment..."
+echo "Scaling payments-api to 3 replicas"
+echo "Deployment ID: deploy-production-$(date +%s)"
+echo "All replicas healthy"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Starting rolling deployment...
+        │ Scaling payments-api to 3 replicas
+        │ Deployment ID: deploy-production-1774599290
+        │ All replicas healthy
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy' COMPLETED
+│  └─ ✅ SUBTASK 'deploy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_verify
+│  ┌─ 🔄 INVOKING SUBTASK: verify
+
+┌─ 🎯 TASK: verify
+│  💡 Health check and validation
+│
+├─ ⚡ STEP: health_check
+│  📝 Check service health (retries on failure)
+│  ┌─ 💻 COMMAND: echo "Checking health at https://payments-api.example.com/health"
+echo "Status: 200 OK"
+echo "Response: {\"status\":\"healthy\",\"version\":\"v1.0.0\"}"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Checking health at https://payments-api.example.com/health
+│       │ Status: 200 OK
+│       │ Response: {"status":"healthy","version":"v1.0.0"}
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_health
+│  ┌─ 🔍 ASSERTION: steps.health_check.http_status === 200
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: {{ contains "healthy" steps.health_check.response }}
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 2 conditions passed
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: smoke_test
+   ┌─ 💻 COMMAND: echo "Running smoke tests against production..."
+echo "POST /api/payments -- 201 Created"
+echo "GET  /api/payments/1 -- 200 OK"
+echo "All smoke tests passed"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Running smoke tests against production...
+        │ POST /api/payments -- 201 Created
+        │ GET  /api/payments/1 -- 200 OK
+        │ All smoke tests passed
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'verify' COMPLETED
+│  └─ ✅ SUBTASK 'verify' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: report
+   ┌─ 💻 COMMAND: echo ""
+echo "=========================================="
+echo "  Deployment Complete"
+echo "=========================================="
+echo "  App:         payments-api"
+echo "  Version:     v1.0.0"
+echo "  Environment: production"
+echo "  Replicas:    3"
+echo "=========================================="
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ ==========================================
+        │   Deployment Complete
+        │ ==========================================
+        │   App:         payments-api
+        │   Version:     v1.0.0
+        │   Environment: production
+        │   Replicas:    3
+        │ ==========================================
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_deploy_pipeline
+    task: main
+    expect:
+      success: true
+      output_contains:
+        - "=== Build Phase ==="
+        - "Building payments-api:v1.0.0"
+        - "Running unit tests..."
+        - "42 tests passed, 0 failed"
+        - "ASSERTION PASSED"
+        - "Pushing registry.example.com/payments-api:v1.0.0"
+        - "Image pushed successfully"
+        - "=== Deploy Phase ==="
+        - "Environment: production"
+        - "Replicas:    3"
+        - "Starting rolling deployment..."
+        - "Scaling payments-api to 3 replicas"
+        - "All replicas healthy"
+        - "Checking health at https://payments-api.example.com/health"
+        - "Status: 200 OK"
+        - "All smoke tests passed"
+        - "Deployment Complete"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## incident response
+
+Incident Response Automation
+
+```yaml
+# Example: Incident Response Automation
+# Automated incident response that checks service health,
+# extracts diagnostic data, evaluates conditions, and takes action.
+#
+# Combines: shell commands, data extraction, conditionals,
+# assertions, and structured outputs.
+#
+# Try: orchstep run
+# Try: orchstep run --var service_url="https://my-service.example.com"
+
+name: incident-response
+desc: "Automated incident response with diagnostics and remediation"
+
+defaults:
+  service_name: "order-service"
+  service_url: "https://order-service.example.com"
+  alert_threshold_ms: 500
+  error_rate_threshold: 5
+  escalation_channel: "#incidents"
+
+tasks:
+  # --- Gather diagnostics ---
+  gather_diagnostics:
+    desc: "Collect system health and performance data"
+    steps:
+      - name: check_health
+        desc: "Query the service health endpoint"
+        func: shell
+        do: |
+          echo "Checking {{ vars.service_url }}/health"
+          echo "HTTP 200"
+          echo '{"status":"degraded","version":"v2.3.1","uptime":"72h","db":"healthy","cache":"timeout"}'
+        outputs:
+          http_status: 200
+          health_data: '{"status":"degraded","version":"v2.3.1","uptime":"72h","db":"healthy","cache":"timeout"}'
+          service_status: "degraded"
+
+      - name: check_metrics
+        desc: "Pull recent performance metrics"
+        func: shell
+        do: |
+          echo "=== Performance Metrics ==="
+          echo "p50_latency_ms: 120"
+          echo "p99_latency_ms: 850"
+          echo "error_rate_pct: 3.2"
+          echo "requests_per_sec: 1500"
+        outputs:
+          p50_latency: 120
+          p99_latency: 850
+          error_rate: 3.2
+          rps: 1500
+
+      - name: check_resources
+        desc: "Check resource utilization"
+        func: shell
+        do: |
+          echo "=== Resource Utilization ==="
+          echo "cpu_pct: 78"
+          echo "memory_pct: 65"
+          echo "disk_pct: 42"
+          echo "pod_restarts: 0"
+        outputs:
+          cpu: 78
+          memory: 65
+          disk: 42
+          restarts: 0
+
+  # --- Evaluate severity ---
+  evaluate:
+    desc: "Determine incident severity and required actions"
+    steps:
+      - name: run_diagnostics
+        task: gather_diagnostics
+
+      - name: check_critical
+        desc: "Check for critical conditions"
+        func: assert
+        args:
+          conditions:
+            - condition: "steps.run_diagnostics.http_status === 200"
+              desc: "Service is reachable"
+            - condition: 'steps.run_diagnostics.service_status !== "down"'
+              desc: "Service is not completely down"
+        catch:
+          - name: critical_alert
+            func: shell
+            do: |
+              echo "CRITICAL: Service is unreachable or down!"
+              echo "Escalating to {{ vars.escalation_channel }}"
+
+      # Check if latency exceeds threshold
+      - name: latency_check
+        if: "steps.run_diagnostics.p99_latency > vars.alert_threshold_ms"
+        func: shell
+        do: |
+          echo "WARNING: p99 latency ({{ steps.run_diagnostics.p99_latency }}ms) exceeds threshold ({{ vars.alert_threshold_ms }}ms)"
+        outputs:
+          latency_alert: "true"
+
+      # Determine recommended action based on conditions
+      - name: recommend_action
+        func: shell
+        do: |
+          echo "=== Incident Assessment ==="
+          echo "Service: {{ vars.service_name }}"
+          echo "Status:  {{ steps.run_diagnostics.service_status }}"
+          echo "p99:     {{ steps.run_diagnostics.p99_latency }}ms"
+          echo "Errors:  {{ steps.run_diagnostics.error_rate }}%"
+          echo "CPU:     {{ steps.run_diagnostics.cpu }}%"
+          echo ""
+          echo "Recommended actions:"
+          echo "  1. Check cache connectivity (cache: timeout)"
+          echo "  2. Monitor p99 latency trend"
+          echo "  3. Review recent deployments"
+        outputs:
+          severity: "warning"
+          action: "investigate_cache"
+
+  # --- Remediation ---
+  remediate:
+    desc: "Execute automated remediation"
+    steps:
+      - name: assess
+        task: evaluate
+
+      - name: restart_cache
+        desc: "Restart the cache layer"
+        func: shell
+        do: |
+          echo "Restarting cache connection pool..."
+          echo "Cache reconnected successfully"
+        outputs:
+          cache_status: "healthy"
+
+      - name: verify_fix
+        desc: "Verify the remediation worked"
+        func: shell
+        do: |
+          echo "Post-remediation health check:"
+          echo "Status: healthy"
+          echo "p99 latency: 180ms"
+          echo "Cache: connected"
+        outputs:
+          post_status: "healthy"
+          post_latency: 180
+
+      - name: validate_recovery
+        func: assert
+        args:
+          conditions:
+            - condition: 'steps.verify_fix.post_status === "healthy"'
+              desc: "Service recovered to healthy state"
+            - condition: "steps.verify_fix.post_latency < 500"
+              desc: "Latency is back within threshold"
+
+  main:
+    desc: "Run full incident response workflow"
+    steps:
+      - name: respond
+        task: remediate
+
+      - name: report
+        func: shell
+        do: |
+          echo ""
+          echo "=========================================="
+          echo "  Incident Response Complete"
+          echo "=========================================="
+          echo "  Service:     {{ vars.service_name }}"
+          echo "  Resolution:  Cache reconnection"
+          echo "  Status:      Recovered"
+          echo "=========================================="
+```
+
+---
+
+## multi env promotion
+
+Multi-Environment Promotion
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Multi-Environment Promotion
+# Promote an application through dev -> staging -> production using
+# loops, conditionals, variables, and task calling.
+#
+# This pattern is common in CI/CD: deploy to each environment in
+# sequence, run validation, and only promote if checks pass.
+#
+# Try: orchstep run
+# Try: orchstep run --var skip_prod=true
+
+name: multi-env-promotion
+desc: "Promote a release through dev, staging, and production"
+
+defaults:
+  app_name: "checkout-service"
+  version: "v3.2.0"
+  skip_prod: false
+  environments:
+    - name: "dev"
+      replicas: 1
+      run_e2e: false
+    - name: "staging"
+      replicas: 3
+      run_e2e: true
+    - name: "production"
+      replicas: 10
+      run_e2e: true
+
+tasks:
+  # --- Deploy to a single environment ---
+  deploy_to_env:
+    desc: "Deploy and validate in one environment"
+    vars:
+      env_name: ""
+      replicas: 1
+      run_e2e: false
+    steps:
+      - name: deploy
+        func: shell
+        do: |
+          echo "--- Deploying {{ vars.app_name }}:{{ vars.version }} to {{ vars.env_name }} ---"
+          echo "Scaling to {{ vars.replicas }} replicas"
+          echo "Deployment complete"
+        outputs:
+          status: "deployed"
+
+      - name: basic_check
+        func: shell
+        do: |
+          echo "Health check for {{ vars.env_name }}: OK"
+        outputs:
+          healthy: "true"
+
+      # Run E2E tests only if the environment requires them
+      - name: e2e_tests
+        if: "{{ vars.run_e2e }}"
+        func: shell
+        do: |
+          echo "Running E2E tests in {{ vars.env_name }}..."
+          echo "12 scenarios passed"
+        outputs:
+          passed: 12
+          failed: 0
+
+      - name: validate
+        func: assert
+        args:
+          condition: 'steps.deploy.status === "deployed"'
+          desc: "Deployment to {{ vars.env_name }} must succeed"
+
+  # --- Loop through environments ---
+  promote_through_envs:
+    desc: "Deploy to each environment in sequence"
+    steps:
+      # Loop over the environments list
+      - name: deploy_dev
+        desc: "Deploy to dev"
+        task: deploy_to_env
+        vars:
+          env_name: "dev"
+          replicas: 1
+          run_e2e: false
+
+      - name: deploy_staging
+        desc: "Deploy to staging with E2E tests"
+        task: deploy_to_env
+        vars:
+          env_name: "staging"
+          replicas: 3
+          run_e2e: true
+
+      # Conditionally skip production
+      - name: deploy_prod
+        desc: "Deploy to production (skipped if skip_prod=true)"
+        if: '{{ not (eq vars.skip_prod true) }}'
+        task: deploy_to_env
+        vars:
+          env_name: "production"
+          replicas: 10
+          run_e2e: true
+
+  main:
+    desc: "Run the full promotion pipeline"
+    steps:
+      - name: announce
+        func: shell
+        do: |
+          echo "=========================================="
+          echo "  Release Promotion: {{ vars.app_name }} {{ vars.version }}"
+          echo "=========================================="
+
+      - name: promote
+        task: promote_through_envs
+
+      - name: summary
+        func: shell
+        do: |
+          echo ""
+          echo "=========================================="
+          echo "  Promotion Complete"
+          echo "=========================================="
+          echo "  {{ vars.app_name }} {{ vars.version }}"
+          echo "  dev -> staging -> production"
+          echo "=========================================="
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: multi-env-promotion
+│ 📋 Promote a release through dev, staging, and production
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run the full promotion pipeline
+│
+├─ ⚡ STEP: announce
+│  ┌─ 💻 COMMAND: echo "=========================================="
+echo "  Release Promotion: checkout-service v3.2.0"
+echo "=========================================="
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ ==========================================
+│       │   Release Promotion: checkout-service v3.2.0
+│       │ ==========================================
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: promote
+│  ┌─ 🔄 INVOKING SUBTASK: promote_through_envs
+
+┌─ 🎯 TASK: promote_through_envs
+│  💡 Deploy to each environment in sequence
+│
+├─ ⚡ STEP: deploy_dev
+│  📝 Deploy to dev
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_to_env
+⚠️  Step 'deploy_dev' calls task 'deploy_to_env' with 'vars:' but no 'with:' - did you mean to use 'with:' to pass parameters to the task?
+   Note: 'vars:' is for local step scope only and will NOT be passed to the task.
+
+┌─ 🎯 TASK: deploy_to_env
+│  💡 Deploy and validate in one environment
+│
+├─ ⚡ STEP: deploy
+│  ┌─ 💻 COMMAND: echo "--- Deploying checkout-service:v3.2.0 to  ---"
+echo "Scaling to 1 replicas"
+echo "Deployment complete"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ --- Deploying checkout-service:v3.2.0 to  ---
+│       │ Scaling to 1 replicas
+│       │ Deployment complete
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: basic_check
+│  ┌─ 💻 COMMAND: echo "Health check for : OK"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Health check for : OK
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: e2e_tests
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: validate
+   ┌─ 🔍 ASSERTION: steps.deploy.status === "deployed"
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_to_env' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_to_env' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_staging
+│  📝 Deploy to staging with E2E tests
+│  ┌─ 🔄 INVOKING SUBTASK: deploy_to_env
+⚠️  Step 'deploy_staging' calls task 'deploy_to_env' with 'vars:' but no 'with:' - did you mean to use 'with:' to pass parameters to the task?
+   Note: 'vars:' is for local step scope only and will NOT be passed to the task.
+
+┌─ 🎯 TASK: deploy_to_env
+│  💡 Deploy and validate in one environment
+│
+├─ ⚡ STEP: deploy
+│  ┌─ 💻 COMMAND: echo "--- Deploying checkout-service:v3.2.0 to  ---"
+echo "Scaling to 1 replicas"
+echo "Deployment complete"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ --- Deploying checkout-service:v3.2.0 to  ---
+│       │ Scaling to 1 replicas
+│       │ Deployment complete
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: basic_check
+│  ┌─ 💻 COMMAND: echo "Health check for : OK"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Health check for : OK
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: e2e_tests
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: validate
+   ┌─ 🔍 ASSERTION: steps.deploy.status === "deployed"
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_to_env' COMPLETED
+│  └─ ✅ SUBTASK 'deploy_to_env' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: deploy_prod
+   📝 Deploy to production (skipped if skip_prod=true)
+
+┌─ 🎯 TASK: deploy_to_env
+│  💡 Deploy and validate in one environment
+│
+├─ ⚡ STEP: deploy
+│  ┌─ 💻 COMMAND: echo "--- Deploying checkout-service:v3.2.0 to  ---"
+echo "Scaling to 1 replicas"
+echo "Deployment complete"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ --- Deploying checkout-service:v3.2.0 to  ---
+│       │ Scaling to 1 replicas
+│       │ Deployment complete
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: basic_check
+│  ┌─ 💻 COMMAND: echo "Health check for : OK"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Health check for : OK
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: e2e_tests
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: validate
+   ┌─ 🔍 ASSERTION: steps.deploy.status === "deployed"
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy_to_env' COMPLETED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'promote_through_envs' COMPLETED
+│  └─ ✅ SUBTASK 'promote_through_envs' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo ""
+echo "=========================================="
+echo "  Promotion Complete"
+echo "=========================================="
+echo "  checkout-service v3.2.0"
+echo "  dev -> staging -> production"
+echo "=========================================="
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ ==========================================
+        │   Promotion Complete
+        │ ==========================================
+        │   checkout-service v3.2.0
+        │   dev -> staging -> production
+        │ ==========================================
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## release automation
+
+Release Automation
+
+```yaml
+# Example: Release Automation
+# Automate the full release lifecycle: version bump, changelog,
+# build, tag, and publish -- using shell commands, variables, loops,
+# and task composition.
+#
+# Combines: git operations, shell, variables, step outputs,
+# assertions, and task calling.
+#
+# Try: orchstep run
+# Try: orchstep run --var release_type=minor
+# Try: orchstep run --var dry_run=true
+
+name: release-automation
+desc: "Automated release pipeline with versioning, tagging, and publish"
+
+defaults:
+  project_name: "orchstep-sdk"
+  release_type: "patch"       # major, minor, or patch
+  current_version: "2.3.1"
+  dry_run: false
+  artifacts:
+    - name: "linux-amd64"
+      os: "linux"
+      arch: "amd64"
+    - name: "darwin-arm64"
+      os: "darwin"
+      arch: "arm64"
+    - name: "windows-amd64"
+      os: "windows"
+      arch: "amd64"
+
+tasks:
+  # --- Calculate new version ---
+  bump_version:
+    desc: "Calculate the next version based on release type"
+    steps:
+      - name: calculate
+        func: shell
+        do: |
+          echo "Current version: {{ vars.current_version }}"
+          echo "Release type:    {{ vars.release_type }}"
+          echo "New version:     2.3.2"
+        outputs:
+          new_version: "2.3.2"
+          tag: "v2.3.2"
+
+      - name: validate_version
+        func: assert
+        args:
+          conditions:
+            - condition: 'steps.calculate.new_version !== "{{ vars.current_version }}"'
+              desc: "New version must differ from current"
+            - condition: 'matches("^\\d+\\.\\d+\\.\\d+$", steps.calculate.new_version)'
+              desc: "Version must follow semver format"
+
+  # --- Generate changelog ---
+  changelog:
+    desc: "Generate changelog from recent commits"
+    steps:
+      - name: collect_changes
+        func: shell
+        do: |
+          echo "=== Changelog ==="
+          echo ""
+          echo "## What's Changed"
+          echo "- fix: resolve timeout in payment processor"
+          echo "- feat: add webhook retry with exponential backoff"
+          echo "- docs: update API reference for v2 endpoints"
+          echo "- chore: upgrade Go to 1.22"
+          echo ""
+          echo "3 contributors, 12 commits since v{{ vars.current_version }}"
+        outputs:
+          entry_count: 4
+          changelog: "fix: timeout, feat: webhook retry, docs: API ref, chore: Go 1.22"
+
+      - name: verify_changelog
+        func: assert
+        args:
+          condition: "steps.collect_changes.entry_count > 0"
+          desc: "Changelog must have at least one entry"
+
+  # --- Build artifacts ---
+  build_artifacts:
+    desc: "Build release artifacts for all platforms"
+    steps:
+      - name: build_linux
+        func: shell
+        do: |
+          echo "Building {{ vars.project_name }} for linux/amd64..."
+          echo "Binary: dist/{{ vars.project_name }}-linux-amd64"
+        outputs:
+          artifact: "dist/{{ vars.project_name }}-linux-amd64"
+
+      - name: build_darwin
+        func: shell
+        do: |
+          echo "Building {{ vars.project_name }} for darwin/arm64..."
+          echo "Binary: dist/{{ vars.project_name }}-darwin-arm64"
+        outputs:
+          artifact: "dist/{{ vars.project_name }}-darwin-arm64"
+
+      - name: build_windows
+        func: shell
+        do: |
+          echo "Building {{ vars.project_name }} for windows/amd64..."
+          echo "Binary: dist/{{ vars.project_name }}-windows-amd64.exe"
+        outputs:
+          artifact: "dist/{{ vars.project_name }}-windows-amd64.exe"
+
+      - name: verify_builds
+        func: assert
+        args:
+          conditions:
+            - condition: '{{ contains "linux" steps.build_linux.artifact }}'
+              desc: "Linux artifact built"
+            - condition: '{{ contains "darwin" steps.build_darwin.artifact }}'
+              desc: "Darwin artifact built"
+            - condition: '{{ contains "windows" steps.build_windows.artifact }}'
+              desc: "Windows artifact built"
+
+  # --- Tag and publish ---
+  publish:
+    desc: "Create git tag and publish release"
+    steps:
+      - name: create_tag
+        func: shell
+        do: |
+          echo "Creating git tag {{ vars.tag }}"
+          echo "Tag created successfully"
+        outputs:
+          tag: "{{ vars.tag }}"
+
+      - name: push_tag
+        if: '{{ not (eq vars.dry_run true) }}'
+        func: shell
+        do: |
+          echo "Pushing tag {{ steps.create_tag.tag }} to origin"
+          echo "Tag pushed"
+
+      - name: create_release
+        if: '{{ not (eq vars.dry_run true) }}'
+        func: shell
+        do: |
+          echo "Creating GitHub release for {{ steps.create_tag.tag }}"
+          echo "Uploading 3 artifacts..."
+          echo "Release published"
+        outputs:
+          release_url: "https://github.com/example/{{ vars.project_name }}/releases/tag/{{ steps.create_tag.tag }}"
+
+      - name: dry_run_notice
+        if: "{{ vars.dry_run }}"
+        func: shell
+        do: |
+          echo "DRY RUN: Skipped push and release creation"
+          echo "Would have published {{ steps.create_tag.tag }}"
+
+  # --- Full pipeline ---
+  main:
+    desc: "Run the complete release automation"
+    steps:
+      - name: announce
+        func: shell
+        do: |
+          echo "=========================================="
+          echo "  Release: {{ vars.project_name }}"
+          echo "  Type:    {{ vars.release_type }}"
+          echo "  Dry run: {{ vars.dry_run }}"
+          echo "=========================================="
+
+      - name: version
+        task: bump_version
+
+      - name: changes
+        task: changelog
+
+      - name: build
+        task: build_artifacts
+
+      - name: release
+        task: publish
+        vars:
+          tag: "v2.3.2"
+
+      - name: report
+        func: shell
+        do: |
+          echo ""
+          echo "=========================================="
+          echo "  Release Complete"
+          echo "=========================================="
+          echo "  Project:  {{ vars.project_name }}"
+          echo "  Version:  {{ vars.current_version }} -> v2.3.2"
+          echo "  Artifacts: 3 platforms"
+          echo "  Changelog: 4 entries"
+          echo "=========================================="
+```

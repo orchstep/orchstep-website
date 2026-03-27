@@ -1,0 +1,915 @@
+---
+title: "Assertions Examples"
+description: "OrchStep examples for assertions, multi-conditions, and validation patterns"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## uasic assertions
+
+Basic Assertions
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Basic Assertions
+# Use the `assert` function to validate conditions in your workflows.
+# OrchStep supports two syntax styles for conditions:
+#
+#   1. Go template syntax:  {{ eq vars.status "ok" }}
+#   2. JavaScript syntax:   vars.status === "ok"
+#
+# Detection is automatic: if the expression starts with {{ it uses
+# Go templates; otherwise it uses JavaScript (goja VM).
+#
+# Try: orchstep run
+# Try: orchstep run js_assertions
+
+name: basic-assertions
+desc: "Simple condition checking with the assert function"
+
+defaults:
+  environment: "prod"
+  count: 10
+  status: "ok"
+  message: "deployment successful"
+
+tasks:
+  # --- Go Template assertions ---
+  go_template_assertions:
+    desc: "Assertions using Go template syntax"
+    steps:
+      - name: equality
+        desc: "Check exact equality"
+        func: assert
+        args:
+          condition: '{{ eq vars.environment "prod" }}'
+          desc: "Environment must be production"
+
+      - name: numeric
+        desc: "Numeric comparison"
+        func: assert
+        args:
+          condition: "{{ gt vars.count 5 }}"
+          desc: "Count must be greater than 5"
+
+      - name: string_contains
+        desc: "Check if a string contains a substring"
+        func: assert
+        args:
+          condition: '{{ contains "successful" vars.message }}'
+          desc: "Message must contain 'successful'"
+
+      - name: logical_and
+        desc: "Combine conditions with AND"
+        func: assert
+        args:
+          condition: '{{ and (eq vars.status "ok") (gt vars.count 5) }}'
+          desc: "Status must be ok AND count > 5"
+
+      - name: logical_or
+        desc: "Combine conditions with OR"
+        func: assert
+        args:
+          condition: '{{ or (eq vars.environment "prod") (eq vars.environment "staging") }}'
+          desc: "Environment must be prod or staging"
+
+      - name: negation
+        desc: "Negate a condition"
+        func: assert
+        args:
+          condition: '{{ not (eq vars.environment "dev") }}'
+          desc: "Environment must not be dev"
+
+  # --- JavaScript assertions ---
+  js_assertions:
+    desc: "Assertions using JavaScript syntax"
+    steps:
+      - name: equality
+        desc: "Check exact equality"
+        func: assert
+        args:
+          condition: 'vars.environment === "prod"'
+          desc: "Environment must be production"
+
+      - name: numeric
+        desc: "Numeric comparison"
+        func: assert
+        args:
+          condition: "vars.count > 5"
+          desc: "Count must be greater than 5"
+
+      - name: string_contains
+        desc: "Check if a string contains a substring"
+        func: assert
+        args:
+          condition: 'vars.message.includes("successful")'
+          desc: "Message must contain 'successful'"
+
+      - name: logical_and
+        desc: "Combine conditions with &&"
+        func: assert
+        args:
+          condition: 'vars.status === "ok" && vars.count > 5'
+          desc: "Status must be ok AND count > 5"
+
+      - name: negation
+        desc: "Negate a condition"
+        func: assert
+        args:
+          condition: 'vars.environment !== "dev"'
+          desc: "Environment must not be dev"
+
+  # --- Validate step outputs ---
+  validate_outputs:
+    desc: "Assert against step outputs"
+    steps:
+      - name: run_check
+        func: shell
+        do: 'echo "Status: healthy | Latency: 42ms"'
+        outputs:
+          result: "{{ result.output }}"
+
+      - name: check_healthy
+        desc: "Verify the health check output"
+        func: assert
+        args:
+          condition: '{{ contains "healthy" steps.run_check.result }}'
+          desc: "Service must report healthy status"
+
+  main:
+    desc: "Run all assertion demos"
+    steps:
+      - name: run_go_templates
+        task: go_template_assertions
+
+      - name: run_javascript
+        task: js_assertions
+
+      - name: run_output_check
+        task: validate_outputs
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Assertion Syntax Comparison ==="
+          echo ""
+          echo "Go Template:          JavaScript:"
+          echo "  eq .a .b              a === b"
+          echo "  gt .n 5               n > 5"
+          echo "  contains .s text      s.includes('text')"
+          echo "  and (c1) (c2)         c1 && c2"
+          echo "  or (c1) (c2)          c1 || c2"
+          echo "  not (c)               !c"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: basic-assertions
+│ 📋 Simple condition checking with the assert function
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run all assertion demos
+│
+├─ ⚡ STEP: run_go_templates
+│  ┌─ 🔄 INVOKING SUBTASK: go_template_assertions
+
+┌─ 🎯 TASK: go_template_assertions
+│  💡 Assertions using Go template syntax
+│
+├─ ⚡ STEP: equality
+│  📝 Check exact equality
+│  ┌─ 🔍 ASSERTION: {{ eq vars.environment "prod" }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: numeric
+│  📝 Numeric comparison
+│  ┌─ 🔍 ASSERTION: {{ gt vars.count 5 }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: string_contains
+│  📝 Check if a string contains a substring
+│  ┌─ 🔍 ASSERTION: {{ contains "successful" vars.message }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: logical_and
+│  📝 Combine conditions with AND
+│  ┌─ 🔍 ASSERTION: {{ and (eq vars.status "ok") (gt vars.count 5) }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: logical_or
+│  📝 Combine conditions with OR
+│  ┌─ 🔍 ASSERTION: {{ or (eq vars.environment "prod") (eq vars.environment "staging") }}
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: negation
+   📝 Negate a condition
+   ┌─ 🔍 ASSERTION: {{ not (eq vars.environment "dev") }}
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'go_template_assertions' COMPLETED
+│  └─ ✅ SUBTASK 'go_template_assertions' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_javascript
+│  ┌─ 🔄 INVOKING SUBTASK: js_assertions
+
+┌─ 🎯 TASK: js_assertions
+│  💡 Assertions using JavaScript syntax
+│
+├─ ⚡ STEP: equality
+│  📝 Check exact equality
+│  ┌─ 🔍 ASSERTION: vars.environment === "prod"
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: numeric
+│  📝 Numeric comparison
+│  ┌─ 🔍 ASSERTION: vars.count > 5
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: string_contains
+│  📝 Check if a string contains a substring
+│  ┌─ 🔍 ASSERTION: vars.message.includes("successful")
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: logical_and
+│  📝 Combine conditions with &&
+│  ┌─ 🔍 ASSERTION: vars.status === "ok" && vars.count > 5
+│  └─ ✅ ASSERTION PASSED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: negation
+   📝 Negate a condition
+   ┌─ 🔍 ASSERTION: vars.environment !== "dev"
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'js_assertions' COMPLETED
+│  └─ ✅ SUBTASK 'js_assertions' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_output_check
+│  ┌─ 🔄 INVOKING SUBTASK: validate_outputs
+
+┌─ 🎯 TASK: validate_outputs
+│  💡 Assert against step outputs
+│
+├─ ⚡ STEP: run_check
+│  ┌─ 💻 COMMAND: echo "Status: healthy | Latency: 42ms"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Status: healthy | Latency: 42ms
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: check_healthy
+   📝 Verify the health check output
+   ┌─ 🔍 ASSERTION: {{ contains "healthy" steps.run_check.result }}
+   └─ ✅ ASSERTION PASSED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'validate_outputs' COMPLETED
+│  └─ ✅ SUBTASK 'validate_outputs' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Assertion Syntax Comparison ==="
+echo ""
+echo "Go Template:          JavaScript:"
+echo "  eq .a .b              a === b"
+echo "  gt .n 5               n > 5"
+echo "  contains .s text      s.includes('text')"
+echo "  and (c1) (c2)         c1 && c2"
+echo "  or (c1) (c2)          c1 || c2"
+echo "  not (c)               !c"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Assertion Syntax Comparison ===
+        │ 
+        │ Go Template:          JavaScript:
+        │   eq .a .b              a === b
+        │   gt .n 5               n > 5
+        │   contains .s text      s.includes('text')
+        │   and (c1) (c2)         c1 && c2
+        │   or (c1) (c2)          c1 || c2
+        │   not (c)               !c
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## multi conditions
+
+Multiple Conditions in a Single Assertion
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Multiple Conditions in a Single Assertion
+# Instead of writing many single-condition assert steps, you can
+# validate multiple conditions in one step using `conditions:` (plural).
+#
+# All conditions must pass for the step to succeed. If any fail,
+# OrchStep reports which specific conditions failed.
+#
+# You can mix Go template and JavaScript syntax across conditions.
+#
+# Try: orchstep run
+# Try: orchstep run validate_deployment
+
+name: multi-conditions
+desc: "Multiple conditions in a single assertion step"
+
+defaults:
+  app_name: "payments-api"
+  version: "2.4.1"
+  replicas: 3
+  features:
+    - "payments"
+    - "refunds"
+    - "webhooks"
+
+tasks:
+  # --- Multiple conditions: all must pass ---
+  validate_deployment:
+    desc: "Validate a deployment meets all requirements"
+    steps:
+      - name: simulate_deploy
+        func: shell
+        do: |
+          echo "Deployed payments-api v2.4.1"
+          echo "Replicas: 3/3 ready"
+          echo "Health: OK"
+        outputs:
+          log: "{{ result.output }}"
+          status: "success"
+          exit_code: 0
+
+      - name: check_all_conditions
+        desc: "All conditions must pass"
+        func: assert
+        args:
+          conditions:
+            - condition: "{{ eq steps.simulate_deploy.exit_code 0 }}"
+              desc: "Deploy command must exit successfully"
+
+            - condition: '{{ contains "Health: OK" steps.simulate_deploy.log }}'
+              desc: "Health check must report OK"
+
+            - condition: '{{ contains "3/3 ready" steps.simulate_deploy.log }}'
+              desc: "All replicas must be ready"
+
+            - condition: 'steps.simulate_deploy.status === "success"'
+              desc: "Deployment status must be success"
+
+  # --- Mix Go template and JavaScript in one assert ---
+  mixed_syntax:
+    desc: "Go template and JavaScript conditions can coexist"
+    steps:
+      - name: check_config
+        desc: "Validate app config from multiple angles"
+        func: assert
+        args:
+          conditions:
+            # Go template style
+            - condition: '{{ eq vars.app_name "payments-api" }}'
+              desc: "App name matches"
+
+            # JavaScript style
+            - condition: 'vars.replicas >= 2'
+              desc: "At least 2 replicas configured"
+
+            # Go template with sprig function
+            - condition: "{{ gt (len vars.features) 2 }}"
+              desc: "At least 3 features enabled"
+
+            # JavaScript with array operations
+            - condition: 'vars.features.length === 3'
+              desc: "Exactly 3 features defined"
+
+  # --- Handling expected failures with catch ---
+  graceful_failure:
+    desc: "Handle assertion failures gracefully"
+    steps:
+      - name: risky_check
+        desc: "Some conditions may fail -- catch handles it"
+        func: assert
+        args:
+          conditions:
+            - condition: '{{ eq vars.app_name "payments-api" }}'
+              desc: "App name is correct"
+
+            - condition: "vars.replicas >= 10"
+              desc: "Need 10+ replicas for prod (will fail in dev)"
+        catch:
+          - name: handle_failure
+            func: shell
+            do: |
+              echo "Assertion failed: not enough replicas for production"
+              echo "Current replicas: {{ vars.replicas }}"
+              echo "Consider scaling up before promoting to production"
+
+  main:
+    desc: "Run all multi-condition demos"
+    steps:
+      - name: demo_deployment
+        task: validate_deployment
+
+      - name: demo_mixed
+        task: mixed_syntax
+
+      - name: demo_failure_handling
+        task: graceful_failure
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Multi-Condition Assertions ==="
+          echo ""
+          echo "Use 'conditions:' (plural) for multiple checks:"
+          echo "  func: assert"
+          echo "  args:"
+          echo "    conditions:"
+          echo "      - condition: expr1"
+          echo "        desc: what it checks"
+          echo "      - condition: expr2"
+          echo "        desc: what it checks"
+          echo ""
+          echo "Benefits:"
+          echo "  - All conditions evaluated in one step"
+          echo "  - Clear reporting of which conditions failed"
+          echo "  - Mix Go template and JavaScript freely"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: multi-conditions
+│ 📋 Multiple conditions in a single assertion step
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run all multi-condition demos
+│
+├─ ⚡ STEP: demo_deployment
+│  ┌─ 🔄 INVOKING SUBTASK: validate_deployment
+
+┌─ 🎯 TASK: validate_deployment
+│  💡 Validate a deployment meets all requirements
+│
+├─ ⚡ STEP: simulate_deploy
+│  ┌─ 💻 COMMAND: echo "Deployed payments-api v2.4.1"
+echo "Replicas: 3/3 ready"
+echo "Health: OK"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Deployed payments-api v2.4.1
+│       │ Replicas: 3/3 ready
+│       │ Health: OK
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: check_all_conditions
+   📝 All conditions must pass
+   ┌─ 🔍 ASSERTION: {{ eq steps.simulate_deploy.exit_code 0 }}
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: {{ contains "Health: OK" steps.simulate_deploy.log }}
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: {{ contains "3/3 ready" steps.simulate_deploy.log }}
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: steps.simulate_deploy.status === "success"
+   └─ ✅ ASSERTION PASSED
+   ✅ All 4 conditions passed
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'validate_deployment' COMPLETED
+│  └─ ✅ SUBTASK 'validate_deployment' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_mixed
+│  ┌─ 🔄 INVOKING SUBTASK: mixed_syntax
+
+┌─ 🎯 TASK: mixed_syntax
+│  💡 Go template and JavaScript conditions can coexist
+│
+└─ ⚡ STEP: check_config
+   📝 Validate app config from multiple angles
+   ┌─ 🔍 ASSERTION: {{ eq vars.app_name "payments-api" }}
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: vars.replicas >= 2
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: {{ gt (len vars.features) 2 }}
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: vars.features.length === 3
+   └─ ✅ ASSERTION PASSED
+   ✅ All 4 conditions passed
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'mixed_syntax' COMPLETED
+│  └─ ✅ SUBTASK 'mixed_syntax' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_failure_handling
+│  ┌─ 🔄 INVOKING SUBTASK: graceful_failure
+
+┌─ 🎯 TASK: graceful_failure
+│  💡 Handle assertion failures gracefully
+│
+└─ ⚡ STEP: risky_check
+   📝 Some conditions may fail -- catch handles it
+   ┌─ 🔍 ASSERTION: {{ eq vars.app_name "payments-api" }}
+   └─ ✅ ASSERTION PASSED
+   ┌─ 🔍 ASSERTION: vars.replicas >= 10
+   └─ ❌ ASSERTION FAILED
+⚠️  Step 'risky_check' failed after 1 attempts
+   🔄 Executing catch steps for 'risky_check'...
+│  ┌─ 💻 COMMAND: echo "Assertion failed: not enough replicas for production"
+echo "Current replicas: 3"
+echo "Consider scaling up before promoting to production"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Assertion failed: not enough replicas for production
+│       │ Current replicas: 3
+│       │ Consider scaling up before promoting to production
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ Catch steps recovered from error
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'graceful_failure' COMPLETED
+│  └─ ✅ SUBTASK 'graceful_failure' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Multi-Condition Assertions ==="
+echo ""
+echo "Use 'conditions:' (plural) for multiple checks:"
+echo "  func: assert"
+echo "  args:"
+echo "    conditions:"
+echo "      - condition: expr1"
+echo "        desc: what it checks"
+echo "      - condition: expr2"
+echo "        desc: what it checks"
+echo ""
+echo "Benefits:"
+echo "  - All conditions evaluated in one step"
+echo "  - Clear reporting of which conditions failed"
+echo "  - Mix Go template and JavaScript freely"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Multi-Condition Assertions ===
+        │ 
+        │ Use 'conditions:' (plural) for multiple checks:
+        │   func: assert
+        │   args:
+        │     conditions:
+        │       - condition: expr1
+        │         desc: what it checks
+        │       - condition: expr2
+        │         desc: what it checks
+        │ 
+        │ Benefits:
+        │   - All conditions evaluated in one step
+        │   - Clear reporting of which conditions failed
+        │   - Mix Go template and JavaScript freely
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## unified patterns
+
+Unified Assertion Patterns
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Unified Assertion Patterns
+# Comprehensive assertion patterns covering variables, step outputs,
+# objects, arrays, and helper functions.
+#
+# OrchStep provides JavaScript helper functions for common checks:
+#   exists("path")       -- true if the path resolves to a value
+#   len(value)           -- length of array or string
+#   contains(haystack, needle) -- check array/string containment
+#   matches(regex, str)  -- regex match
+#   get("path")          -- safely access nested values (returns null if missing)
+#
+# Try: orchstep run
+
+name: unified-patterns
+desc: "Unified assertion patterns for validation"
+
+defaults:
+  app_name: "order-service"
+  version: "3.1.0"
+  max_retries: 5
+  tags:
+    - name: "api"
+      priority: 1
+    - name: "backend"
+      priority: 2
+    - name: "critical"
+      priority: 3
+  config:
+    database:
+      host: "db.example.com"
+      port: 5432
+      pool_size: 25
+    cache:
+      enabled: true
+      ttl: 300
+
+tasks:
+  main:
+    desc: "Demonstrate unified assertion patterns"
+    steps:
+      # Setup: create step outputs to validate against
+      - name: health_check
+        func: shell
+        do: |
+          echo "Service: order-service"
+          echo "Status: healthy"
+          echo "Uptime: 72h"
+          echo "Active connections: 142"
+        outputs:
+          report: "{{ result.output }}"
+          active_users: 142
+          status: "healthy"
+          services: ["order-service", "payment-service", "notification-service"]
+
+      # --- Pattern 1: Variable validation ---
+      - name: validate_vars
+        desc: "Validate definition variables"
+        func: assert
+        args:
+          conditions:
+            - condition: '{{ eq vars.app_name "order-service" }}'
+              desc: "App name is set correctly"
+
+            - condition: "{{ gt vars.max_retries 3 }}"
+              desc: "Max retries is sufficient"
+
+            - condition: '{{ vars.version | upper | eq "3.1.0" }}'
+              desc: "Version string is correct (with sprig pipe)"
+
+      # --- Pattern 2: Step output validation ---
+      - name: validate_outputs
+        desc: "Validate step outputs from previous steps"
+        func: assert
+        args:
+          conditions:
+            - condition: 'steps.health_check.status === "healthy"'
+              desc: "Service reports healthy"
+
+            - condition: "steps.health_check.active_users > 100"
+              desc: "More than 100 active users"
+
+            - condition: '{{ contains "Uptime" steps.health_check.report }}'
+              desc: "Report includes uptime information"
+
+      # --- Pattern 3: Nested object validation ---
+      - name: validate_nested
+        desc: "Validate nested object properties"
+        func: assert
+        args:
+          conditions:
+            - condition: '{{ eq vars.config.database.host "db.example.com" }}'
+              desc: "Database host is configured"
+
+            - condition: "vars.config.database.pool_size >= 20"
+              desc: "Pool size is adequate"
+
+            - condition: "vars.config.cache.enabled === true"
+              desc: "Cache is enabled"
+
+            - condition: "vars.config.cache.ttl === 300"
+              desc: "Cache TTL is 5 minutes"
+
+      # --- Pattern 4: Array validation ---
+      - name: validate_arrays
+        desc: "Validate array contents and properties"
+        func: assert
+        args:
+          conditions:
+            - condition: "{{ eq (len vars.tags) 3 }}"
+              desc: "Exactly 3 tags defined"
+
+            - condition: 'vars.tags[0].name === "api"'
+              desc: "First tag is 'api'"
+
+            - condition: "vars.tags[2].priority === 3"
+              desc: "Critical tag has priority 3"
+
+            - condition: 'steps.health_check.services.length === 3'
+              desc: "Three services reported"
+
+      # --- Pattern 5: JavaScript helper functions ---
+      - name: validate_with_helpers
+        desc: "Use built-in helper functions"
+        func: assert
+        args:
+          conditions:
+            # exists() -- check if a value is defined
+            - condition: 'exists("steps.health_check.status")'
+              desc: "Health check status exists"
+
+            # len() -- get length of arrays or strings
+            - condition: "len(steps.health_check.services) === 3"
+              desc: "Three services returned"
+
+            # contains() -- check array or string containment
+            - condition: 'contains(steps.health_check.services, "order-service")'
+              desc: "Order service is in the list"
+
+            # matches() -- regex matching
+            - condition: 'matches("^order", vars.app_name)'
+              desc: "App name starts with 'order'"
+
+            # get() -- safe nested access (returns null for missing paths)
+            - condition: 'get("vars.config.database.host") === "db.example.com"'
+              desc: "Safely access nested config"
+
+      # --- Pattern 6: Complex expressions ---
+      - name: validate_complex
+        desc: "Complex multi-condition expressions"
+        func: assert
+        args:
+          conditions:
+            # Go template: combine multiple checks
+            - condition: '{{ and (eq vars.config.cache.enabled true) (gt vars.config.database.pool_size 10) }}'
+              desc: "Cache enabled and pool size adequate"
+
+            # JavaScript: rich expression with multiple checks
+            - condition: |
+                vars.config.cache.enabled &&
+                vars.config.database.pool_size > 10 &&
+                vars.app_name.includes("service") &&
+                len(vars.tags) >= 3
+              desc: "All infrastructure requirements met"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Assertion Helper Functions ==="
+          echo ""
+          echo "  exists('path')            -- value is defined"
+          echo "  len(value)                -- array/string length"
+          echo "  contains(haystack, needle) -- array/string search"
+          echo "  matches(regex, str)        -- regex matching"
+          echo "  get('path')               -- safe nested access"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: unified-patterns
+│ 📋 Unified assertion patterns for validation
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Demonstrate unified assertion patterns
+│
+├─ ⚡ STEP: health_check
+│  ┌─ 💻 COMMAND: echo "Service: order-service"
+echo "Status: healthy"
+echo "Uptime: 72h"
+echo "Active connections: 142"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Service: order-service
+│       │ Status: healthy
+│       │ Uptime: 72h
+│       │ Active connections: 142
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_vars
+│  📝 Validate definition variables
+│  ┌─ 🔍 ASSERTION: {{ eq vars.app_name "order-service" }}
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: {{ gt vars.max_retries 3 }}
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: {{ vars.version | upper | eq "3.1.0" }}
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 3 conditions passed
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_outputs
+│  📝 Validate step outputs from previous steps
+│  ┌─ 🔍 ASSERTION: steps.health_check.status === "healthy"
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: steps.health_check.active_users > 100
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: {{ contains "Uptime" steps.health_check.report }}
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 3 conditions passed
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_nested
+│  📝 Validate nested object properties
+│  ┌─ 🔍 ASSERTION: {{ eq vars.config.database.host "db.example.com" }}
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: vars.config.database.pool_size >= 20
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: vars.config.cache.enabled === true
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: vars.config.cache.ttl === 300
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 4 conditions passed
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_arrays
+│  📝 Validate array contents and properties
+│  ┌─ 🔍 ASSERTION: {{ eq (len vars.tags) 3 }}
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: vars.tags[0].name === "api"
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: vars.tags[2].priority === 3
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: steps.health_check.services.length === 3
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 4 conditions passed
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_with_helpers
+│  📝 Use built-in helper functions
+│  ┌─ 🔍 ASSERTION: exists("steps.health_check.status")
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: len(steps.health_check.services) === 3
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: contains(steps.health_check.services, "order-service")
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: matches("^order", vars.app_name)
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: get("vars.config.database.host") === "db.example.com"
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 5 conditions passed
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: validate_complex
+│  📝 Complex multi-condition expressions
+│  ┌─ 🔍 ASSERTION: {{ and (eq vars.config.cache.enabled true) (gt vars.config.database.pool_size 10) }}
+│  └─ ✅ ASSERTION PASSED
+│  ┌─ 🔍 ASSERTION: vars.config.cache.enabled &&
+vars.config.database.pool_size > 10 &&
+vars.app_name.includes("service") &&
+len(vars.tags) >= 3
+
+│  └─ ✅ ASSERTION PASSED
+   ✅ All 2 conditions passed
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Assertion Helper Functions ==="
+echo ""
+echo "  exists('path')            -- value is defined"
+echo "  len(value)                -- array/string length"
+echo "  contains(haystack, needle) -- array/string search"
+echo "  matches(regex, str)        -- regex matching"
+echo "  get('path')               -- safe nested access"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Assertion Helper Functions ===
+        │ 
+        │   exists('path')            -- value is defined
+        │   len(value)                -- array/string length
+        │   contains(haystack, needle) -- array/string search
+        │   matches(regex, str)        -- regex matching
+        │   get('path')               -- safe nested access
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

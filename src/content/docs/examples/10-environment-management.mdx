@@ -1,0 +1,945 @@
+---
+title: "Environment Management Examples"
+description: "OrchStep examples for environment variables, scoping, and file loading"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## env uetween steps
+
+Environment Variable Scoping Between Steps
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Environment Variable Scoping Between Steps
+# Shows how env vars flow between steps and tasks, including override
+# precedence and scope isolation.
+#
+# Precedence (highest to lowest):
+#   Step-level env  >  Task-level env  >  Workflow-level env
+#
+# When a step calls a task with `env:`, those vars override the
+# target task's own `env:` for that invocation only.
+#
+# Try: orchstep run
+# Try: orchstep run show_override_hierarchy
+
+name: env-between-steps
+desc: "Environment variable scoping between steps and tasks"
+
+tasks:
+  # --- Step-level env overrides task-level env ---
+  show_override_hierarchy:
+    desc: "Step env overrides task env; function env overrides step env"
+    env:
+      DB_HOST: "task-db.example.com"
+      DB_PORT: "5432"
+      LOG_LEVEL: "info"
+    steps:
+      - name: task_level_only
+        desc: "This step inherits task-level env"
+        func: shell
+        do: |
+          echo "=== Task-level env ==="
+          echo "DB_HOST   = {{ env.DB_HOST }}"
+          echo "DB_PORT   = {{ env.DB_PORT }}"
+          echo "LOG_LEVEL = {{ env.LOG_LEVEL }}"
+
+      - name: step_override
+        desc: "This step overrides DB_HOST for just this step"
+        func: shell
+        env:
+          DB_HOST: "step-db.internal"
+          LOG_LEVEL: "debug"
+        do: |
+          echo "=== Step-level override ==="
+          echo "DB_HOST   = {{ env.DB_HOST }}"
+          echo "DB_PORT   = {{ env.DB_PORT }}"
+          echo "LOG_LEVEL = {{ env.LOG_LEVEL }}"
+
+      - name: back_to_task_level
+        desc: "After the step, task-level env is restored"
+        func: shell
+        do: |
+          echo "=== Back to task-level ==="
+          echo "DB_HOST   = {{ env.DB_HOST }}"
+          echo "LOG_LEVEL = {{ env.LOG_LEVEL }}"
+
+  # --- Passing env vars from a step to a called task ---
+  backend_task:
+    desc: "Backend service configuration"
+    env:
+      SERVICE_HOST: "default-backend.local"
+      SERVICE_PORT: "8080"
+    steps:
+      - name: show_config
+        func: shell
+        do: |
+          echo "SERVICE_HOST = {{ env.SERVICE_HOST }}"
+          echo "SERVICE_PORT = {{ env.SERVICE_PORT }}"
+          echo "EXTRA_VAR    = {{ env.EXTRA_VAR }}"
+
+  call_task_with_env:
+    desc: "Override target task's env from the calling step"
+    steps:
+      # Call backend_task with default env
+      - name: call_with_defaults
+        desc: "Use the task's own env"
+        task: backend_task
+
+      # Override env for this specific invocation
+      - name: call_with_overrides
+        desc: "Override SERVICE_HOST and inject EXTRA_VAR"
+        task: backend_task
+        env:
+          SERVICE_HOST: "prod-backend.example.com"
+          EXTRA_VAR: "injected-from-caller"
+
+      # After the call, the override is gone (scope isolation)
+      - name: call_again_with_defaults
+        desc: "Overrides do not persist -- back to defaults"
+        task: backend_task
+
+  # --- Template expressions in env vars ---
+  template_env:
+    desc: "Env vars can use template expressions for dynamic values"
+    steps:
+      - name: set_base
+        desc: "Set a base URL via env_var"
+        func: env_var
+        do: set
+        args:
+          vars:
+            API_HOST: "api.example.com"
+            API_VERSION: "v2"
+
+      - name: use_template
+        desc: "Build a connection string from env templates"
+        func: shell
+        env:
+          API_URL: "https://{{ env.API_HOST }}/{{ env.API_VERSION }}"
+        do: |
+          echo "API_URL = {{ env.API_URL }}"
+
+  main:
+    desc: "Run all env scoping demos"
+    steps:
+      - name: demo_hierarchy
+        task: show_override_hierarchy
+
+      - name: demo_task_calls
+        task: call_task_with_env
+
+      - name: demo_templates
+        task: template_env
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Environment Scoping Rules ==="
+          echo "  1. Step env overrides task env (for that step only)"
+          echo "  2. Step->task env overrides target task env (for that call)"
+          echo "  3. Overrides are scoped -- they do not persist"
+          echo "  4. Env values support template expressions"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: env-between-steps
+│ 📋 Environment variable scoping between steps and tasks
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run all env scoping demos
+│
+├─ ⚡ STEP: demo_hierarchy
+│  ┌─ 🔄 INVOKING SUBTASK: show_override_hierarchy
+
+┌─ 🎯 TASK: show_override_hierarchy
+│  💡 Step env overrides task env; function env overrides step env
+│
+├─ ⚡ STEP: task_level_only
+│  📝 This step inherits task-level env
+│  ┌─ 💻 COMMAND: echo "=== Task-level env ==="
+echo "DB_HOST   = task-db.example.com"
+echo "DB_PORT   = 5432"
+echo "LOG_LEVEL = info"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Task-level env ===
+│       │ DB_HOST   = task-db.example.com
+│       │ DB_PORT   = 5432
+│       │ LOG_LEVEL = info
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: step_override
+│  📝 This step overrides DB_HOST for just this step
+│  ┌─ 💻 COMMAND: echo "=== Step-level override ==="
+echo "DB_HOST   = step-db.internal"
+echo "DB_PORT   = 5432"
+echo "LOG_LEVEL = debug"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ === Step-level override ===
+│       │ DB_HOST   = step-db.internal
+│       │ DB_PORT   = 5432
+│       │ LOG_LEVEL = debug
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: back_to_task_level
+   📝 After the step, task-level env is restored
+   ┌─ 💻 COMMAND: echo "=== Back to task-level ==="
+echo "DB_HOST   = task-db.example.com"
+echo "LOG_LEVEL = info"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Back to task-level ===
+        │ DB_HOST   = task-db.example.com
+        │ LOG_LEVEL = info
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_override_hierarchy' COMPLETED
+│  └─ ✅ SUBTASK 'show_override_hierarchy' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_task_calls
+│  ┌─ 🔄 INVOKING SUBTASK: call_task_with_env
+
+┌─ 🎯 TASK: call_task_with_env
+│  💡 Override target task's env from the calling step
+│
+├─ ⚡ STEP: call_with_defaults
+│  📝 Use the task's own env
+│  ┌─ 🔄 INVOKING SUBTASK: backend_task
+
+┌─ 🎯 TASK: backend_task
+│  💡 Backend service configuration
+│
+└─ ⚡ STEP: show_config
+   ┌─ 💻 COMMAND: echo "SERVICE_HOST = default-backend.local"
+echo "SERVICE_PORT = 8080"
+echo "EXTRA_VAR    = <no value>"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ SERVICE_HOST = default-backend.local
+        │ SERVICE_PORT = 8080
+        │ EXTRA_VAR    = <no value>
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'backend_task' COMPLETED
+│  └─ ✅ SUBTASK 'backend_task' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: call_with_overrides
+│  📝 Override SERVICE_HOST and inject EXTRA_VAR
+│  ┌─ 🔄 INVOKING SUBTASK: backend_task
+
+┌─ 🎯 TASK: backend_task
+│  💡 Backend service configuration
+│
+└─ ⚡ STEP: show_config
+   ┌─ 💻 COMMAND: echo "SERVICE_HOST = prod-backend.example.com"
+echo "SERVICE_PORT = 8080"
+echo "EXTRA_VAR    = injected-from-caller"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ SERVICE_HOST = prod-backend.example.com
+        │ SERVICE_PORT = 8080
+        │ EXTRA_VAR    = injected-from-caller
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'backend_task' COMPLETED
+│  └─ ✅ SUBTASK 'backend_task' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: call_again_with_defaults
+   📝 Overrides do not persist -- back to defaults
+   ┌─ 🔄 INVOKING SUBTASK: backend_task
+
+┌─ 🎯 TASK: backend_task
+│  💡 Backend service configuration
+│
+└─ ⚡ STEP: show_config
+   ┌─ 💻 COMMAND: echo "SERVICE_HOST = default-backend.local"
+echo "SERVICE_PORT = 8080"
+echo "EXTRA_VAR    = <no value>"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ SERVICE_HOST = default-backend.local
+        │ SERVICE_PORT = 8080
+        │ EXTRA_VAR    = <no value>
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'backend_task' COMPLETED
+   └─ ✅ SUBTASK 'backend_task' COMPLETED
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'call_task_with_env' COMPLETED
+│  └─ ✅ SUBTASK 'call_task_with_env' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_templates
+│  ┌─ 🔄 INVOKING SUBTASK: template_env
+
+┌─ 🎯 TASK: template_env
+│  💡 Env vars can use template expressions for dynamic values
+│
+├─ ⚡ STEP: set_base
+│  📝 Set a base URL via env_var
+│  🔧 Setting 2 definition-level environment variables
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: use_template
+   📝 Build a connection string from env templates
+   ┌─ 💻 COMMAND: echo "API_URL = https://api.example.com/v2"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ API_URL = https://api.example.com/v2
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'template_env' COMPLETED
+│  └─ ✅ SUBTASK 'template_env' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Environment Scoping Rules ==="
+echo "  1. Step env overrides task env (for that step only)"
+echo "  2. Step->task env overrides target task env (for that call)"
+echo "  3. Overrides are scoped -- they do not persist"
+echo "  4. Env values support template expressions"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Environment Scoping Rules ===
+        │   1. Step env overrides task env (for that step only)
+        │   2. Step->task env overrides target task env (for that call)
+        │   3. Overrides are scoped -- they do not persist
+        │   4. Env values support template expressions
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## env file loading
+
+Loading from .env and .envrc Files
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Loading from .env and .envrc Files
+# OrchStep can load environment variables from external files.
+# Supports standard .env format and bash-style .envrc (with export).
+#
+# Features:
+#   - Load one or multiple files in sequence (later files override earlier)
+#   - Supports .env key=value format
+#   - Supports .envrc with `export KEY=VALUE` format
+#   - Loaded vars persist for the rest of the task
+#
+# You can also use hierarchical file-based configuration with env_config
+# pointing to a directory of environment YAML files.
+#
+# Try: orchstep run
+# Try: orchstep run show_hierarchical --env dev
+
+name: env-file-loading
+desc: "Loading environment variables from .env and .envrc files"
+
+tasks:
+  # --- Load from .env files ---
+  load_env_files:
+    desc: "Load env vars from external files"
+    steps:
+      # Load one or more .env / .envrc files
+      # Files are loaded in order; later files override earlier ones
+      - name: load_from_files
+        desc: "Load vars from .envrc then override with prod.env"
+        func: env_var
+        do: load_env_file
+        args:
+          file:
+            - ./config/.envrc       # Base config (export KEY=VALUE)
+            - ./config/prod.env     # Prod overrides (KEY=VALUE)
+
+      - name: show_loaded_vars
+        desc: "Vars from both files are now available"
+        func: shell
+        do: |
+          echo "HOST = $HOST"
+          echo "PORT = $PORT"
+          echo "DEBUG = $DEBUG"
+
+  # --- Hierarchical file-based environments ---
+  # Point env_config.env_dir to a directory of YAML files.
+  # OrchStep loads: defaults.yml -> group.yml -> environment.yml
+  show_hierarchical:
+    desc: "Hierarchical environments loaded from a directory"
+    steps:
+      - name: show_resolved
+        func: shell
+        do: |
+          echo "=== Hierarchical Environment Config ==="
+          echo "app_name  = {{ vars.app_name }}"
+          echo "db_host   = {{ vars.db_host }}"
+          echo "replicas  = {{ vars.replicas }}"
+          echo "log_level = {{ vars.log_level }}"
+
+  main:
+    desc: "Demonstrate env file loading"
+    steps:
+      - name: explain
+        func: shell
+        do: |
+          echo "=== .env / .envrc File Loading ==="
+          echo ""
+          echo "Supported file formats:"
+          echo ""
+          echo "  .env format:"
+          echo "    HOST=prod.example.com"
+          echo "    PORT=6432"
+          echo "    DATABASE_URL=postgres://host:port/app"
+          echo ""
+          echo "  .envrc format (bash-style):"
+          echo "    export HOST=dev.example.com"
+          echo "    export PORT=5432"
+          echo "    export FEATURE_FLAGS='{\"beta\":true}'"
+          echo ""
+          echo "Load files with:"
+          echo "  func: env_var"
+          echo "  do: load_env_file"
+          echo "  args:"
+          echo "    file:"
+          echo "      - ./base.envrc"
+          echo "      - ./overrides.env"
+          echo ""
+          echo "Or use hierarchical YAML directories with:"
+          echo "  env_config:"
+          echo "    env_dir: environments"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: env-file-loading
+│ 📋 Loading environment variables from .env and .envrc files
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Demonstrate env file loading
+│
+└─ ⚡ STEP: explain
+   ┌─ 💻 COMMAND: echo "=== .env / .envrc File Loading ==="
+echo ""
+echo "Supported file formats:"
+echo ""
+echo "  .env format:"
+echo "    HOST=prod.example.com"
+echo "    PORT=6432"
+echo "    DATABASE_URL=postgres://host:port/app"
+echo ""
+echo "  .envrc format (bash-style):"
+echo "    export HOST=dev.example.com"
+echo "    export PORT=5432"
+echo "    export FEATURE_FLAGS='{\"beta\":true}'"
+echo ""
+echo "Load files with:"
+echo "  func: env_var"
+echo "  do: load_env_file"
+echo "  args:"
+echo "    file:"
+echo "      - ./base.envrc"
+echo "      - ./overrides.env"
+echo ""
+echo "Or use hierarchical YAML directories with:"
+echo "  env_config:"
+echo "    env_dir: environments"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === .env / .envrc File Loading ===
+        │ 
+        │ Supported file formats:
+        │ 
+        │   .env format:
+        │     HOST=prod.example.com
+        │     PORT=6432
+        │     DATABASE_URL=postgres://host:port/app
+        │ 
+        │   .envrc format (bash-style):
+        │     export HOST=dev.example.com
+        │     export PORT=5432
+        │     export FEATURE_FLAGS='{"beta":true}'
+        │ 
+        │ Load files with:
+        │   func: env_var
+        │   do: load_env_file
+        │   args:
+        │     file:
+        │       - ./base.envrc
+        │       - ./overrides.env
+        │ 
+        │ Or use hierarchical YAML directories with:
+        │   env_config:
+        │     env_dir: environments
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## env groups
+
+Environment Groups
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Environment Groups
+# Manage multi-environment configuration (dev, staging, production)
+# with shared group defaults and per-environment overrides.
+#
+# Structure:
+#   env_groups  -- shared settings for groups of environments
+#   environments -- per-environment settings that inherit from a group
+#   defaults    -- base fallback values
+#
+# Precedence: Step > Task > Environment > Group > Defaults
+#
+# Try: orchstep run --env dev
+# Try: orchstep run --env staging
+# Try: orchstep run --env production
+# Try: orchstep run show_precedence --env qa
+
+name: env-groups-demo
+desc: "Environment groups for multi-environment configuration"
+
+# Base defaults -- used when no environment is selected
+defaults:
+  app_name: "payments-api"
+  base_domain: "example.com"
+  log_level: "info"
+  replicas: 1
+  db_host: ""
+  api_host: ""
+  monitoring_enabled: false
+
+# Shared settings for groups of environments
+env_groups:
+  nonprod:
+    vars:
+      replicas: 2
+      log_level: "debug"
+      api_host: "api-nonprod"
+
+  prod:
+    vars:
+      replicas: 10
+      log_level: "error"
+      api_host: "api"
+      monitoring_enabled: true
+
+# Individual environments inherit from their group
+environments:
+  dev:
+    group: nonprod
+    vars:
+      db_host: "dev-db"
+
+  qa:
+    group: nonprod
+    vars:
+      db_host: "qa-db"
+      replicas: 3          # Override the nonprod group default
+
+  staging:
+    group: nonprod
+    vars:
+      db_host: "staging-db"
+      replicas: 5
+
+  production:
+    group: prod
+    vars:
+      db_host: "prod-db"
+
+tasks:
+  main:
+    desc: "Display resolved configuration for the selected environment"
+    steps:
+      - name: show_config
+        func: shell
+        do: |
+          echo "=== Resolved Configuration ==="
+          echo "app_name           = {{ vars.app_name }}"
+          echo "db_host            = {{ vars.db_host }}.{{ vars.base_domain }}"
+          echo "api_url            = https://{{ vars.api_host }}.{{ vars.base_domain }}"
+          echo "replicas           = {{ vars.replicas }}"
+          echo "log_level          = {{ vars.log_level }}"
+          echo "monitoring_enabled = {{ vars.monitoring_enabled }}"
+
+  # Show that task/step vars still override environment vars
+  show_precedence:
+    desc: "Task vars override environment-level vars"
+    vars:
+      replicas: 100      # Task-level override
+    steps:
+      - name: task_level
+        func: shell
+        do: |
+          echo "Task-level replicas = {{ vars.replicas }}"
+
+      - name: step_level
+        vars:
+          replicas: 200  # Step-level override (highest in-file priority)
+        func: shell
+        do: |
+          echo "Step-level replicas = {{ vars.replicas }}"
+
+      - name: explain
+        func: shell
+        do: |
+          echo ""
+          echo "=== Variable Precedence ==="
+          echo "  Step vars (200) > Task vars (100) > Environment > Group > Defaults"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: env-groups-demo
+│ 📋 Environment groups for multi-environment configuration
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Display resolved configuration for the selected environment
+│
+└─ ⚡ STEP: show_config
+   ┌─ 💻 COMMAND: echo "=== Resolved Configuration ==="
+echo "app_name           = payments-api"
+echo "db_host            = .example.com"
+echo "api_url            = https://.example.com"
+echo "replicas           = 1"
+echo "log_level          = info"
+echo "monitoring_enabled = false"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Resolved Configuration ===
+        │ app_name           = payments-api
+        │ db_host            = .example.com
+        │ api_url            = https://.example.com
+        │ replicas           = 1
+        │ log_level          = info
+        │ monitoring_enabled = false
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## env var uasics
+
+Environment Variable Basics
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Environment Variable Basics
+# How to set, save, load, and use environment variables in OrchStep.
+#
+# OrchStep provides the `env_var` function to manage environment
+# variables programmatically. You can also set env vars directly
+# on tasks and steps using the `env:` key.
+#
+# Access any env var in templates with {{ env.VAR_NAME }}.
+#
+# Try: orchstep run
+# Try: orchstep run use_env_var_function
+
+name: env-var-basics
+desc: "Setting, loading, and using environment variables"
+
+# Security policy: control which env vars are visible in logs
+config:
+  env_security:
+    safe_vars:
+      - APP_NAME
+      - APP_PORT
+      - LOG_LEVEL
+    safe_patterns:
+      - "APP_*"
+    sensitive_patterns:
+      - "SECRET_*"
+      - "*_TOKEN"
+
+tasks:
+  # --- Set env vars directly on a task ---
+  show_task_env:
+    desc: "Env vars set at the task level"
+    env:
+      APP_NAME: "my-service"
+      APP_PORT: "8080"
+      LOG_LEVEL: "info"
+    steps:
+      - name: print_env
+        desc: "Read env vars with {{ env.VAR_NAME }}"
+        func: shell
+        do: |
+          echo "APP_NAME  = {{ env.APP_NAME }}"
+          echo "APP_PORT  = {{ env.APP_PORT }}"
+          echo "LOG_LEVEL = {{ env.LOG_LEVEL }}"
+
+  # --- Use the env_var function for programmatic management ---
+  use_env_var_function:
+    desc: "Set, save, clear, and restore env vars with env_var function"
+    env:
+      APP_NAME: "api-gateway"
+      APP_PORT: "3000"
+    steps:
+      # Save current environment to a named snapshot
+      - name: save_snapshot
+        desc: "Save env vars to a named set for later restoration"
+        func: env_var
+        do: save
+        args:
+          name: "before_deploy"
+
+      # Programmatically set new env vars
+      - name: set_deploy_vars
+        desc: "Set additional env vars via the env_var function"
+        func: env_var
+        do: set
+        args:
+          vars:
+            DEPLOY_TARGET: "production"
+            DEPLOY_REGION: "us-west-2"
+
+      - name: show_deploy_vars
+        desc: "Verify new env vars are available"
+        func: shell
+        do: |
+          echo "DEPLOY_TARGET = {{ env.DEPLOY_TARGET }}"
+          echo "DEPLOY_REGION = {{ env.DEPLOY_REGION }}"
+          echo "APP_NAME      = {{ env.APP_NAME }}"
+
+      # Clear all env vars
+      - name: clear_env
+        desc: "Clear all environment variables"
+        func: env_var
+        do: clear
+
+      # Restore from snapshot
+      - name: restore_env
+        desc: "Load env vars back from the saved snapshot"
+        func: env_var
+        do: load
+        args:
+          name: "before_deploy"
+
+      - name: verify_restored
+        desc: "Confirm the original vars are back"
+        func: shell
+        do: |
+          echo "After restore:"
+          echo "APP_NAME = {{ env.APP_NAME }}"
+          echo "APP_PORT = {{ env.APP_PORT }}"
+
+  # --- Security: sensitive vars are masked ---
+  show_masking:
+    desc: "Sensitive env vars are masked based on security policy"
+    env:
+      APP_NAME: "public-service"
+      SECRET_KEY: "super-secret-value"
+      AUTH_TOKEN: "tok_abc123"
+    steps:
+      - name: show_vars
+        desc: "Safe vars show values; sensitive vars are masked with ***"
+        func: shell
+        do: |
+          echo "APP_NAME   = {{ env.APP_NAME }}"
+          echo "SECRET_KEY = {{ env.SECRET_KEY }}"
+          echo "AUTH_TOKEN  = {{ env.AUTH_TOKEN }}"
+
+  main:
+    desc: "Run all environment variable demos"
+    steps:
+      - name: demo_task_env
+        task: show_task_env
+
+      - name: demo_env_var_function
+        task: use_env_var_function
+
+      - name: demo_masking
+        task: show_masking
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Environment Variable Features ==="
+          echo "  - env:       Set vars on tasks or steps"
+          echo "  - env_var:   Programmatic set / save / load / clear"
+          echo "  - Security:  Mask sensitive vars in output"
+          echo "  - Templates: Access with {{ env.VAR_NAME }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: env-var-basics
+│ 📋 Setting, loading, and using environment variables
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run all environment variable demos
+│
+├─ ⚡ STEP: demo_task_env
+│  ┌─ 🔄 INVOKING SUBTASK: show_task_env
+
+┌─ 🎯 TASK: show_task_env
+│  💡 Env vars set at the task level
+│
+└─ ⚡ STEP: print_env
+   📝 Read env vars with {{ env.VAR_NAME }}
+   ┌─ 💻 COMMAND: echo "APP_NAME  = my-service"
+echo "APP_PORT  = 8080"
+echo "LOG_LEVEL = info"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ APP_NAME  = my-service
+        │ APP_PORT  = 8080
+        │ LOG_LEVEL = info
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_task_env' COMPLETED
+│  └─ ✅ SUBTASK 'show_task_env' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_env_var_function
+│  ┌─ 🔄 INVOKING SUBTASK: use_env_var_function
+
+┌─ 🎯 TASK: use_env_var_function
+│  💡 Set, save, clear, and restore env vars with env_var function
+│
+├─ ⚡ STEP: save_snapshot
+│  📝 Save env vars to a named set for later restoration
+│  💾 Saving environment variable snapshot: before_deploy
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: set_deploy_vars
+│  📝 Set additional env vars via the env_var function
+│  🔧 Setting 2 definition-level environment variables
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: show_deploy_vars
+│  📝 Verify new env vars are available
+│  ┌─ 💻 COMMAND: echo "DEPLOY_TARGET = production"
+echo "DEPLOY_REGION = us-west-2"
+echo "APP_NAME      = api-gateway"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ DEPLOY_TARGET = production
+│       │ DEPLOY_REGION = us-west-2
+│       │ APP_NAME      = api-gateway
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: clear_env
+│  📝 Clear all environment variables
+│  🧹 Clearing definition-level environment variables
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: restore_env
+│  📝 Load env vars back from the saved snapshot
+│  📂 Loading environment variables from snapshot: before_deploy
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: verify_restored
+   📝 Confirm the original vars are back
+   ┌─ 💻 COMMAND: echo "After restore:"
+echo "APP_NAME = api-gateway"
+echo "APP_PORT = 3000"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ After restore:
+        │ APP_NAME = api-gateway
+        │ APP_PORT = 3000
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'use_env_var_function' COMPLETED
+│  └─ ✅ SUBTASK 'use_env_var_function' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: demo_masking
+│  ┌─ 🔄 INVOKING SUBTASK: show_masking
+
+┌─ 🎯 TASK: show_masking
+│  💡 Sensitive env vars are masked based on security policy
+│
+└─ ⚡ STEP: show_vars
+   📝 Safe vars show values; sensitive vars are masked with ***
+   ┌─ 💻 COMMAND: echo "APP_NAME   = public-service"
+echo "SECRET_KEY = ***"
+echo "AUTH_TOKEN  = ***"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ APP_NAME   = public-service
+        │ SECRET_KEY = ***
+        │ AUTH_TOKEN  = ***
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'show_masking' COMPLETED
+│  └─ ✅ SUBTASK 'show_masking' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: summary
+   ┌─ 💻 COMMAND: echo "=== Environment Variable Features ==="
+echo "  - env:       Set vars on tasks or steps"
+echo "  - env_var:   Programmatic set / save / load / clear"
+echo "  - Security:  Mask sensitive vars in output"
+echo "  - Templates: Access with <no value>"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Environment Variable Features ===
+        │   - env:       Set vars on tasks or steps
+        │   - env_var:   Programmatic set / save / load / clear
+        │   - Security:  Mask sensitive vars in output
+        │   - Templates: Access with <no value>
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>

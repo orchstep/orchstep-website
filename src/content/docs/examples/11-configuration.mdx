@@ -1,0 +1,461 @@
+---
+title: "Configuration Examples"
+description: "OrchStep examples for config defaults, inline config, and task discovery"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## config defaults
+
+Configuration Defaults
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Configuration Defaults
+# OrchStep functions have built-in defaults (e.g. the shell function
+# defaults to the "gosh" interpreter). You can override those defaults
+# using a config file (orchstep-config.yml) so every invocation of a
+# function uses your preferred settings without repeating them.
+#
+# In this example we assume an orchstep-config.yml file in the same
+# directory sets:
+#   func:
+#     shell:
+#       type: "shell"     # Use system shell instead of gosh
+#       timeout: 120      # 2-minute timeout for all shell steps
+#
+# Steps no longer need to specify `type: shell` -- it is the default.
+#
+# Try: orchstep run
+
+name: config-defaults-demo
+desc: "Setting default function configuration via config file"
+
+# With a config file that sets shell defaults, these steps inherit
+# those defaults automatically.
+tasks:
+  main:
+    desc: "Run commands using config-file defaults"
+    steps:
+      - name: hello
+        desc: "Uses the shell type from config -- no need to specify it"
+        func: shell
+        do: echo 'Hello with config defaults!'
+
+      - name: system_info
+        desc: "Another shell step -- also inherits the config defaults"
+        func: shell
+        do: |
+          echo "Shell type: inherited from orchstep-config.yml"
+          echo "Timeout:    inherited from orchstep-config.yml"
+          echo "User:       $USER"
+          echo "Working in: $(pwd)"
+
+      - name: explain
+        func: shell
+        do: |
+          echo ""
+          echo "=== Config Defaults ==="
+          echo "Place an orchstep-config.yml alongside your orchstep.yml:"
+          echo ""
+          echo "  func:"
+          echo "    shell:"
+          echo "      type: shell       # Override default interpreter"
+          echo "      timeout: 120      # Default timeout in seconds"
+          echo "    http:"
+          echo "      timeout: 30       # HTTP request timeout"
+          echo ""
+          echo "All functions will use these defaults automatically."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📂 Discovered 4 task file(s) from tasks/ directory
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: config-defaults-demo
+│ 📋 Setting default function configuration via config file
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run commands using config-file defaults
+│
+├─ ⚡ STEP: hello
+│  📝 Uses the shell type from config -- no need to specify it
+│  ┌─ 💻 COMMAND: echo 'Hello with config defaults!'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Hello with config defaults!
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: system_info
+│  📝 Another shell step -- also inherits the config defaults
+│  ┌─ 💻 COMMAND: echo "Shell type: inherited from orchstep-config.yml"
+echo "Timeout:    inherited from orchstep-config.yml"
+echo "User:       $USER"
+echo "Working in: $(pwd)"
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Shell type: inherited from orchstep-config.yml
+│       │ Timeout:    inherited from orchstep-config.yml
+│       │ User:       mindbuger
+│       │ Working in: /Users/mindbuger/data/git/orchstep/orchstep-public/examples/11-configuration
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: explain
+   ┌─ 💻 COMMAND: echo ""
+echo "=== Config Defaults ==="
+echo "Place an orchstep-config.yml alongside your orchstep.yml:"
+echo ""
+echo "  func:"
+echo "    shell:"
+echo "      type: shell       # Override default interpreter"
+echo "      timeout: 120      # Default timeout in seconds"
+echo "    http:"
+echo "      timeout: 30       # HTTP request timeout"
+echo ""
+echo "All functions will use these defaults automatically."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ 
+        │ === Config Defaults ===
+        │ Place an orchstep-config.yml alongside your orchstep.yml:
+        │ 
+        │   func:
+        │     shell:
+        │       type: shell       # Override default interpreter
+        │       timeout: 120      # Default timeout in seconds
+        │     http:
+        │       timeout: 30       # HTTP request timeout
+        │ 
+        │ All functions will use these defaults automatically.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## inline config
+
+Inline Configuration
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Inline Configuration
+# Instead of a separate orchstep-config.yml file, you can embed
+# function defaults directly in your orchstep.yml using the `config:` key.
+#
+# This is useful for self-contained workflows that need specific
+# function behavior without external files.
+#
+# Try: orchstep run
+
+name: inline-config-demo
+desc: "Inline configuration in orchstep.yml -- no external config file needed"
+
+# Inline config: set function defaults right here
+config:
+  func:
+    shell:
+      type: "shell"      # Use system shell instead of gosh
+      timeout: 60        # 60-second timeout for all shell commands
+
+    http:
+      timeout: 30        # 30-second timeout for HTTP requests
+      method: "GET"      # Default HTTP method
+
+tasks:
+  main:
+    desc: "Steps inherit inline config defaults"
+    steps:
+      - name: hello
+        desc: "Uses shell type from inline config automatically"
+        func: shell
+        do: echo 'Hello with inline config!'
+
+      - name: show_config
+        desc: "All shell steps get type=shell and timeout=60"
+        func: shell
+        do: |
+          echo "=== Inline Configuration ==="
+          echo ""
+          echo "This workflow uses inline config to set:"
+          echo "  shell.type    = shell  (instead of default gosh)"
+          echo "  shell.timeout = 60s"
+          echo "  http.timeout  = 30s"
+          echo "  http.method   = GET"
+          echo ""
+          echo "Every shell step inherits these without repeating them."
+
+  # You can still override per-step when needed
+  custom_step:
+    desc: "Per-step args override inline config"
+    steps:
+      - name: with_longer_timeout
+        desc: "Override the timeout for a long-running command"
+        func: shell
+        args:
+          timeout: 300     # 5 minutes for this specific step
+          cmd: echo 'This step has a 5-minute timeout'
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📂 Discovered 4 task file(s) from tasks/ directory
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: inline-config-demo
+│ 📋 Inline configuration in orchstep.yml -- no external config file needed
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Steps inherit inline config defaults
+│
+├─ ⚡ STEP: hello
+│  📝 Uses shell type from inline config automatically
+│  ┌─ 💻 COMMAND: echo 'Hello with inline config!'
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Hello with inline config!
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: show_config
+   📝 All shell steps get type=shell and timeout=60
+   ┌─ 💻 COMMAND: echo "=== Inline Configuration ==="
+echo ""
+echo "This workflow uses inline config to set:"
+echo "  shell.type    = shell  (instead of default gosh)"
+echo "  shell.timeout = 60s"
+echo "  http.timeout  = 30s"
+echo "  http.method   = GET"
+echo ""
+echo "Every shell step inherits these without repeating them."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Inline Configuration ===
+        │ 
+        │ This workflow uses inline config to set:
+        │   shell.type    = shell  (instead of default gosh)
+        │   shell.timeout = 60s
+        │   http.timeout  = 30s
+        │   http.method   = GET
+        │ 
+        │ Every shell step inherits these without repeating them.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## task discovery
+
+Task File Discovery
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Task File Discovery
+# OrchStep automatically discovers task files in a `tasks/` directory.
+# Each file defines one task and is named after the task.
+#
+# Directory layout:
+#   orchstep.yml              <-- this file (main orchestrator)
+#   tasks/
+#     build.yml               <-- defines the "build" task
+#     test.yml                <-- defines the "test" task
+#     deploy/
+#       staging.yml           <-- defines the "deploy-staging" task
+#       production.yml        <-- defines the "deploy-production" task
+#     infra/
+#       provision.yml         <-- defines the "infra-provision" task
+#       destroy.yml           <-- defines the "infra-destroy" task
+#
+# Naming convention:
+#   - Flat files:   tasks/build.yml      -> task name: "build"
+#   - Nested files: tasks/deploy/staging.yml -> task name: "deploy-staging"
+#
+# Try: orchstep run
+# Try: orchstep run build
+# Try: orchstep run deploy-staging
+# Try: orchstep list   (see all discovered tasks)
+
+name: task-discovery-demo
+desc: "Auto-discovering tasks from the tasks/ directory"
+
+# The main orchestrator calls auto-discovered tasks by name.
+# No need to define them here -- they are loaded from tasks/*.yml
+tasks:
+  main:
+    desc: "Run the full pipeline using discovered tasks"
+    steps:
+      - name: build_app
+        desc: "Call the auto-discovered build task"
+        task: build
+
+      - name: run_tests
+        desc: "Call the auto-discovered test task"
+        task: test
+
+      - name: deploy_to_staging
+        desc: "Call tasks/deploy/staging.yml as 'deploy-staging'"
+        task: deploy-staging
+
+      - name: deploy_to_production
+        desc: "Call tasks/deploy/production.yml as 'deploy-production'"
+        task: deploy-production
+
+      - name: done
+        func: shell
+        do: |
+          echo "=== Task Discovery ==="
+          echo "Tasks are auto-discovered from tasks/ directory:"
+          echo "  tasks/build.yml           -> 'build'"
+          echo "  tasks/test.yml            -> 'test'"
+          echo "  tasks/deploy/staging.yml  -> 'deploy-staging'"
+          echo "  tasks/deploy/production.yml -> 'deploy-production'"
+          echo ""
+          echo "Use 'orchstep list' to see all available tasks."
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+📂 Discovered 4 task file(s) from tasks/ directory
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: task-discovery-demo
+│ 📋 Auto-discovering tasks from the tasks/ directory
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: main
+│  💡 Run the full pipeline using discovered tasks
+│
+├─ ⚡ STEP: build_app
+│  📝 Call the auto-discovered build task
+│  ┌─ 🔄 INVOKING SUBTASK: build
+
+┌─ 🎯 TASK: build
+│  💡 Build the application
+│
+├─ ⚡ STEP: compile
+│  ┌─ 💻 COMMAND: echo "Building application..."
+│  └─ 📤 OUTPUT:
+│       ╭─────────────────────────────────────────────────────────────────────────────────╮
+│       │ Building application...
+│       ╰─────────────────────────────────────────────────────────────────────────────────╯
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: done
+   ┌─ 💻 COMMAND: echo "Build complete."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Build complete.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'build' COMPLETED
+│  └─ ✅ SUBTASK 'build' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: run_tests
+│  📝 Call the auto-discovered test task
+│  ┌─ 🔄 INVOKING SUBTASK: test
+
+┌─ 🎯 TASK: test
+│  💡 Run tests
+│
+└─ ⚡ STEP: run
+   ┌─ 💻 COMMAND: echo "Running tests... PASSED"
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Running tests... PASSED
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'test' COMPLETED
+│  └─ ✅ SUBTASK 'test' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_to_staging
+│  📝 Call tasks/deploy/staging.yml as 'deploy-staging'
+│  ┌─ 🔄 INVOKING SUBTASK: deploy-staging
+
+┌─ 🎯 TASK: deploy-staging
+│  💡 Deploy to staging
+│
+└─ ⚡ STEP: deploy
+   ┌─ 💻 COMMAND: echo "Deploying to staging..."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to staging...
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy-staging' COMPLETED
+│  └─ ✅ SUBTASK 'deploy-staging' COMPLETED
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: deploy_to_production
+│  📝 Call tasks/deploy/production.yml as 'deploy-production'
+│  ┌─ 🔄 INVOKING SUBTASK: deploy-production
+
+┌─ 🎯 TASK: deploy-production
+│  💡 Deploy to production
+│
+└─ ⚡ STEP: deploy
+   ┌─ 💻 COMMAND: echo "Deploying to production..."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ Deploying to production...
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy-production' COMPLETED
+│  └─ ✅ SUBTASK 'deploy-production' COMPLETED
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: done
+   ┌─ 💻 COMMAND: echo "=== Task Discovery ==="
+echo "Tasks are auto-discovered from tasks/ directory:"
+echo "  tasks/build.yml           -> 'build'"
+echo "  tasks/test.yml            -> 'test'"
+echo "  tasks/deploy/staging.yml  -> 'deploy-staging'"
+echo "  tasks/deploy/production.yml -> 'deploy-production'"
+echo ""
+echo "Use 'orchstep list' to see all available tasks."
+   └─ 📤 OUTPUT:
+        ╭─────────────────────────────────────────────────────────────────────────────────╮
+        │ === Task Discovery ===
+        │ Tasks are auto-discovered from tasks/ directory:
+        │   tasks/build.yml           -> 'build'
+        │   tasks/test.yml            -> 'test'
+        │   tasks/deploy/staging.yml  -> 'deploy-staging'
+        │   tasks/deploy/production.yml -> 'deploy-production'
+        │ 
+        │ Use 'orchstep list' to see all available tasks.
+        ╰─────────────────────────────────────────────────────────────────────────────────╯
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'main' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+</Tabs>
