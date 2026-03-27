@@ -58,7 +58,7 @@ Skills are loaded by LLM agents as context when they need to perform OrchStep-re
 
 ## Skill Integration
 
-Skills are distributed in the [orchstep-public](https://github.com/orchstep/orchstep-public) repository under the `skills/` directory. Any LLM agent framework that supports skill/instruction loading can use them.
+Skills are distributed in the [orchstep](https://github.com/orchstep/orchstep) repository under the `skills/` directory. Any LLM agent framework that supports skill/instruction loading can use them.
 
 Each skill follows a standard format:
 
