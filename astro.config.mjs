@@ -28,6 +28,7 @@ export default defineConfig({
 						{ label: 'Control Flow', slug: 'spec/control-flow' },
 						{ label: 'Error Handling', slug: 'spec/error-handling' },
 						{ label: 'Templates', slug: 'spec/templates' },
+						{ label: 'Parallel Execution', slug: 'spec/parallel' },
 					],
 				},
 				{
@@ -56,6 +57,18 @@ export default defineConfig({
 						{ label: 'Overview', slug: 'agents/overview' },
 						{ label: 'MCP Server', slug: 'agents/mcp' },
 						{ label: 'Skills', slug: 'agents/skills' },
+					],
+				},
+				{
+					label: 'Examples',
+					items: [
+						{ label: 'Showcase', slug: 'examples/showcase' },
+					],
+				},
+				{
+					label: 'Pro Features',
+					items: [
+						{ label: 'Overview', slug: 'pro/overview' },
 					],
 				},
 				{

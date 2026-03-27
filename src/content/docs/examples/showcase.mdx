@@ -1,0 +1,616 @@
+---
+title: Example Showcase
+description: Interactive examples with real execution output
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Six curated examples that demonstrate OrchStep's core capabilities. Each tab shows the YAML source, the actual execution output, and the verification status from the test suite.
+
+---
+
+## Hello World
+
+The simplest OrchStep workflow — one task, one step.
+
+<Tabs>
+  <TabItem label="orchstep.yml">
+    ```yaml
+    # Example: Hello World
+    # The simplest OrchStep workflow -- one task, one step.
+
+    name: hello-world
+    desc: "Your first OrchStep workflow"
+
+    tasks:
+      main:
+        desc: "Say hello"
+        steps:
+          - name: greet
+            desc: "Output a greeting using the shell function"
+            func: shell
+            do: echo 'Hello from OrchStep!'
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+    WORKFLOW: hello-world
+    Your first OrchStep workflow
+
+    TASK: main — Say hello
+
+    STEP: greet
+      Output a greeting using the shell function
+      COMMAND: echo 'Hello from OrchStep!'
+      OUTPUT:
+        Hello from OrchStep!
+      STEP COMPLETED
+
+    TASK 'main' COMPLETED
+    WORKFLOW COMPLETED SUCCESSFULLY
+    ```
+  </TabItem>
+  <TabItem label="Verified">
+    **Lint:** PASS
+    **Run:** PASS (exit 0)
+    **Verified:** 2026-03-27
+  </TabItem>
+</Tabs>
+
+---
+
+## Variable Precedence
+
+OrchStep resolves variables with 4-level precedence: Runtime > Step > Task > Definition.
+
+<Tabs>
+  <TabItem label="orchstep.yml">
+    ```yaml
+    name: variable-precedence-demo
+    desc: "Shows how variables at different levels override each other"
+
+    # Definition variables (lowest priority in-file)
+    defaults:
+      environment: "global-default"
+      region: "us-east-1"
+      replicas: "1"
+      multi_level: "from-definition"
+      app_name: "my-app"
+
+    tasks:
+      show_definition_vars:
+        desc: "Display definition-level defaults"
+        steps:
+          - name: show_globals
+            func: shell
+            do: |
+              echo "environment = {{ vars.environment }}"
+              echo "region      = {{ vars.region }}"
+              echo "replicas    = {{ vars.replicas }}"
+
+      show_task_override:
+        desc: "Task vars override definition vars"
+        vars:
+          environment: "task-staging"
+          replicas: "3"
+          task_only: "only-visible-in-this-task"
+        steps:
+          - name: show_task_vars
+            func: shell
+            do: |
+              echo "environment = {{ vars.environment }}"
+              echo "replicas    = {{ vars.replicas }}"
+              echo "region      = {{ vars.region }}"
+              echo "task_only   = {{ vars.task_only }}"
+
+      show_step_override:
+        desc: "Step vars override task vars"
+        vars:
+          environment: "task-qa"
+          replicas: "5"
+        steps:
+          - name: step_with_overrides
+            desc: "This step overrides environment and replicas"
+            vars:
+              environment: "step-production"
+              replicas: "10"
+            func: shell
+            do: |
+              echo "=== Inside step with overrides ==="
+              echo "environment = {{ vars.environment }}"
+              echo "replicas    = {{ vars.replicas }}"
+
+          - name: step_without_overrides
+            desc: "This step inherits from the task level"
+            func: shell
+            do: |
+              echo "=== Inside step without overrides ==="
+              echo "environment = {{ vars.environment }}"
+              echo "replicas    = {{ vars.replicas }}"
+
+      main:
+        desc: "Run all precedence demonstrations"
+        steps:
+          - name: demo_definition
+            task: show_definition_vars
+          - name: demo_task
+            task: show_task_override
+          - name: demo_step
+            task: show_step_override
+          - name: summary
+            func: shell
+            do: |
+              echo "=== Variable Precedence (highest to lowest) ==="
+              echo "  1. Runtime (--var key=value)"
+              echo "  2. Step vars"
+              echo "  3. Task vars"
+              echo "  4. Definition vars (defaults:)"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+    WORKFLOW: variable-precedence-demo
+
+    TASK: show_definition_vars
+      environment = global-default
+      region      = us-east-1
+      replicas    = 1
+
+    TASK: show_task_override
+      environment = task-staging
+      replicas    = 3
+      region      = us-east-1
+      task_only   = only-visible-in-this-task
+
+    TASK: show_step_override
+      STEP: step_with_overrides
+        === Inside step with overrides ===
+        environment = step-production
+        replicas    = 10
+
+      STEP: step_without_overrides
+        === Inside step without overrides ===
+        environment = task-qa
+        replicas    = 5
+
+    STEP: summary
+      === Variable Precedence (highest to lowest) ===
+        1. Runtime (--var key=value)
+        2. Step vars
+        3. Task vars
+        4. Definition vars (defaults:)
+
+    WORKFLOW COMPLETED SUCCESSFULLY
+    ```
+  </TabItem>
+  <TabItem label="Verified">
+    **Lint:** PASS
+    **Run:** PASS (exit 0)
+    **Verified:** 2026-03-27
+  </TabItem>
+</Tabs>
+
+---
+
+## Retry with Exponential Backoff
+
+Resilient error handling with jitter to prevent thundering herd problems.
+
+<Tabs>
+  <TabItem label="orchstep.yml">
+    ```yaml
+    name: retry-with-jitter-demo
+    desc: "Resilient retry with jitter to prevent thundering herd"
+
+    tasks:
+      resilient-deploy:
+        desc: "Deploy with jitter to avoid retry storms"
+        steps:
+          - name: deploy_to_cluster
+            func: shell
+            do: |
+              echo "Deploying application to cluster..."
+              echo "Deployment successful"
+            retry:
+              max_attempts: 5
+              interval: 2s
+              jitter: 0.3     # +/-30% variation
+
+      api-with-backoff:
+        desc: "API calls with exponential backoff and jitter"
+        steps:
+          - name: call_rate_limited_api
+            func: shell
+            do: |
+              echo "Calling rate-limited API..."
+              echo "Response received"
+            retry:
+              max_attempts: 5
+              interval: 100ms
+              backoff_rate: 2.0    # Double the delay each time
+              jitter: 0.3          # +/-30% jitter on each delay
+              # Approximate delays:
+              # Attempt 1->2: ~100ms  (70ms  - 130ms)
+              # Attempt 2->3: ~200ms  (140ms - 260ms)
+              # Attempt 3->4: ~400ms  (280ms - 520ms)
+              # Attempt 4->5: ~800ms  (560ms - 1040ms)
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+    WORKFLOW: retry-with-jitter-demo
+    Resilient retry with jitter to prevent thundering herd
+
+    TASK: resilient-deploy
+      Deploy with jitter to avoid retry storms
+
+    STEP: deploy_to_cluster
+      COMMAND: echo "Deploying application to cluster..."  ...
+      OUTPUT:
+        Deploying application to cluster...
+        Deployment successful
+      STEP COMPLETED
+
+    TASK 'resilient-deploy' COMPLETED
+    WORKFLOW COMPLETED SUCCESSFULLY
+    ```
+  </TabItem>
+  <TabItem label="Verified">
+    **Lint:** PASS
+    **Run:** PASS (exit 0)
+    **Verified:** 2026-03-27
+  </TabItem>
+</Tabs>
+
+---
+
+## HTTP API Call
+
+Built-in HTTP function with response parsing and variable-driven URLs.
+
+<Tabs>
+  <TabItem label="orchstep.yml">
+    ```yaml
+    name: basic-get-request-demo
+    desc: "HTTP GET requests with variable URLs and response parsing"
+
+    defaults:
+      api_base: "https://httpbin.org"
+
+    tasks:
+      fetch-api-data:
+        desc: "Fetch data from a REST API"
+        steps:
+          - name: get_users
+            func: http
+            do: "GET {{ vars.api_base }}/get"
+            outputs:
+              status: "{{ result.status_code }}"
+              url: "{{ result.url }}"
+              method: "{{ result.method }}"
+
+          - name: show_result
+            func: shell
+            do: |
+              echo "Status: {{ steps.get_users.status }}"
+              echo "URL: {{ steps.get_users.url }}"
+              echo "Method: {{ steps.get_users.method }}"
+
+      parse-json-response:
+        desc: "Access fields from a JSON response body"
+        steps:
+          - name: get_json_data
+            func: http
+            do: "GET {{ vars.api_base }}/json"
+            outputs:
+              author: "{{ result.data_object.slideshow.author }}"
+              title: "{{ result.data_object.slideshow.title }}"
+
+          - name: display_parsed_data
+            func: shell
+            do: |
+              echo "Author: {{ steps.get_json_data.author }}"
+              echo "Title: {{ steps.get_json_data.title }}"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+    WORKFLOW: basic-get-request-demo
+    HTTP GET requests with variable URLs and response parsing
+
+    TASK: fetch-api-data
+      Fetch data from a REST API
+
+    STEP: get_users
+      COMMAND: GET http://localhost:8080/get
+      OUTPUT: GET request received at /get
+
+    STEP: show_result
+      OUTPUT:
+        Status: 200
+        URL: http://localhost:8080/get
+        Method: GET
+      STEP COMPLETED
+
+    TASK 'fetch-api-data' COMPLETED
+    WORKFLOW COMPLETED SUCCESSFULLY
+    ```
+  </TabItem>
+  <TabItem label="Verified">
+    **Lint:** PASS
+    **Run:** PASS (exit 0, tested with mock HTTP server)
+    **Verified:** 2026-03-27
+  </TabItem>
+</Tabs>
+
+---
+
+## Parallel Build
+
+Build frontend and backend concurrently, then deploy with merged outputs.
+
+<Tabs>
+  <TabItem label="orchstep.yml">
+    ```yaml
+    name: parallel-build-demo
+    desc: "Build frontend and backend in parallel, then deploy"
+
+    defaults:
+      version: "2.0.0"
+      environment: staging
+
+    tasks:
+      build-and-deploy:
+        desc: "Parallel build followed by sequential deploy"
+        steps:
+          - name: build_all
+            desc: "Build both services in parallel"
+            parallel:
+              - name: build_frontend
+                func: shell
+                do: |
+                  echo "Building frontend v{{ vars.version }}..."
+                  echo "Compiling TypeScript..."
+                  echo "Bundling assets..."
+                  echo "FRONTEND_ARTIFACT=frontend-{{ vars.version }}.js"
+                outputs:
+                  artifact: '{{ result.output | regexFind "FRONTEND_ARTIFACT=(.+)" }}'
+
+              - name: build_backend
+                func: shell
+                do: |
+                  echo "Building backend v{{ vars.version }}..."
+                  echo "Compiling Go..."
+                  echo "Running unit tests..."
+                  echo "BACKEND_ARTIFACT=backend-{{ vars.version }}"
+                outputs:
+                  artifact: '{{ result.output | regexFind "BACKEND_ARTIFACT=(.+)" }}'
+
+          - name: deploy
+            desc: "Deploy both artifacts"
+            func: shell
+            do: |
+              echo "Deploying to {{ vars.environment }}..."
+              echo "Frontend: {{ steps.build_frontend.artifact }}"
+              echo "Backend: {{ steps.build_backend.artifact }}"
+              echo "Deploy complete!"
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+    WORKFLOW: parallel-build-demo
+    Build frontend and backend in parallel, then deploy
+
+    TASK: build-and-deploy
+      Parallel build followed by sequential deploy
+
+    STEP: build_all — Build both services in parallel
+      Starting parallel execution of 2 steps
+        Building frontend v2.0.0...
+        Building backend v2.0.0...
+        Compiling TypeScript...
+        Compiling Go...
+        Bundling assets...
+        FRONTEND_ARTIFACT=frontend-2.0.0.js
+        Running unit tests...
+        BACKEND_ARTIFACT=backend-2.0.0
+      Parallel step 'build_frontend' completed successfully
+      Parallel step 'build_backend' completed successfully
+      Parallel block completed: 2/2 succeeded
+
+    STEP: deploy — Deploy both artifacts
+      OUTPUT:
+        Deploying to staging...
+        Frontend: frontend-2.0.0.js
+        Backend: backend-2.0.0
+        Deploy complete!
+      STEP COMPLETED
+
+    TASK 'build-and-deploy' COMPLETED
+    WORKFLOW COMPLETED SUCCESSFULLY
+    ```
+  </TabItem>
+  <TabItem label="Verified">
+    **Lint:** PASS
+    **Run:** PASS (exit 0)
+    **Verified:** 2026-03-27
+  </TabItem>
+</Tabs>
+
+---
+
+## Deploy Pipeline
+
+A realistic production pipeline: build, test, assert, deploy, health-check, and smoke-test.
+
+<Tabs>
+  <TabItem label="orchstep.yml">
+    ```yaml
+    name: deploy-pipeline
+    desc: "Production deployment pipeline with health checks and validation"
+
+    defaults:
+      app_name: "payments-api"
+      version: "v1.0.0"
+      environment: "production"
+      registry: "registry.example.com"
+      replicas: 3
+      health_check_url: "https://payments-api.example.com/health"
+      rollback_on_failure: true
+
+    tasks:
+      build:
+        desc: "Build the container image"
+        steps:
+          - name: compile
+            func: shell
+            do: |
+              echo "=== Build Phase ==="
+              echo "Building {{ vars.app_name }}:{{ vars.version }}"
+              echo "Build completed at $(date +%H:%M:%S)"
+            outputs:
+              image_tag: "{{ vars.registry }}/{{ vars.app_name }}:{{ vars.version }}"
+
+          - name: run_tests
+            func: shell
+            do: |
+              echo "Running unit tests..."
+              echo "42 tests passed, 0 failed"
+            outputs:
+              tests_passed: 42
+              tests_failed: 0
+
+          - name: verify_tests
+            func: assert
+            args:
+              conditions:
+                - condition: "steps.run_tests.tests_failed === 0"
+                  desc: "No test failures"
+                - condition: "steps.run_tests.tests_passed > 0"
+                  desc: "At least one test ran"
+
+          - name: push_image
+            func: shell
+            do: |
+              echo "Pushing {{ steps.compile.image_tag }}"
+              echo "Image pushed successfully"
+
+      deploy:
+        desc: "Deploy to the target environment"
+        steps:
+          - name: pre_deploy_check
+            func: shell
+            do: |
+              echo "=== Deploy Phase ==="
+              echo "Environment: {{ vars.environment }}"
+              echo "Replicas:    {{ vars.replicas }}"
+
+          - name: rolling_deploy
+            func: shell
+            do: |
+              echo "Starting rolling deployment..."
+              echo "Scaling {{ vars.app_name }} to {{ vars.replicas }} replicas"
+              echo "All replicas healthy"
+
+      verify:
+        desc: "Health check and validation"
+        steps:
+          - name: health_check
+            desc: "Check service health (retries on failure)"
+            func: shell
+            do: |
+              echo "Checking health at {{ vars.health_check_url }}"
+              echo "Status: 200 OK"
+            retry:
+              max: 5
+              delay: 3
+              backoff: 2
+
+          - name: smoke_test
+            func: shell
+            do: |
+              echo "Running smoke tests against {{ vars.environment }}..."
+              echo "POST /api/payments -- 201 Created"
+              echo "GET  /api/payments/1 -- 200 OK"
+              echo "All smoke tests passed"
+
+      main:
+        desc: "Run the full deploy pipeline"
+        steps:
+          - name: run_build
+            task: build
+          - name: run_deploy
+            task: deploy
+          - name: run_verify
+            task: verify
+          - name: report
+            func: shell
+            do: |
+              echo ""
+              echo "=========================================="
+              echo "  Deployment Complete"
+              echo "=========================================="
+              echo "  App:         {{ vars.app_name }}"
+              echo "  Version:     {{ vars.version }}"
+              echo "  Environment: {{ vars.environment }}"
+              echo "  Replicas:    {{ vars.replicas }}"
+              echo "=========================================="
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+    WORKFLOW: deploy-pipeline
+    Production deployment pipeline with health checks and validation
+
+    TASK: build
+      === Build Phase ===
+      Building payments-api:v1.0.0
+      Build completed at 19:14:50
+
+      Running unit tests...
+      42 tests passed, 0 failed
+
+      ASSERTION: steps.run_tests.tests_failed === 0 — PASSED
+      ASSERTION: steps.run_tests.tests_passed > 0 — PASSED
+      All 2 conditions passed
+
+      Pushing registry.example.com/payments-api:v1.0.0
+      Image pushed successfully
+
+    TASK: deploy
+      === Deploy Phase ===
+      Environment: production
+      Replicas:    3
+
+      Starting rolling deployment...
+      Scaling payments-api to 3 replicas
+      All replicas healthy
+
+    TASK: verify
+      Checking health at https://payments-api.example.com/health
+      Status: 200 OK
+
+      Running smoke tests against production...
+      POST /api/payments -- 201 Created
+      GET  /api/payments/1 -- 200 OK
+      All smoke tests passed
+
+    STEP: report
+      ==========================================
+        Deployment Complete
+      ==========================================
+        App:         payments-api
+        Version:     v1.0.0
+        Environment: production
+        Replicas:    3
+      ==========================================
+
+    WORKFLOW COMPLETED SUCCESSFULLY
+    ```
+  </TabItem>
+  <TabItem label="Verified">
+    **Lint:** PASS
+    **Run:** PASS (exit 0)
+    **Verified:** 2026-03-27
+  </TabItem>
+</Tabs>
