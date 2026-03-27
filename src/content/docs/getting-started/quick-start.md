@@ -23,6 +23,8 @@ tasks:
 orchstep run greet
 ```
 
+> **Shell note:** OrchStep uses POSIX `sh` (`/bin/sh`) by default, so your workflows run on Alpine, distroless containers, and any Linux/macOS system without extra dependencies. On **Windows**, set `type: "gosh"` to use the built-in Go-native shell — no bash or WSL needed. See [Shell Execution](/spec/shell-execution) for details.
+
 ## Add Variables
 
 ```yaml

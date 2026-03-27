@@ -11,7 +11,7 @@ Execute shell commands with streaming output, exit code capture, and output extr
 |-----------|------|----------|-------------|
 | `func` | string | yes | Must be `shell` |
 | `do` | string | yes | Shell command(s) to execute. Supports multi-line with `\|`. |
-| `shell` | string | no | Shell to use: `bash` (default), `gosh`, `pwsh` |
+| `shell` | string | no | Shell type: `shell` (default, POSIX sh), `gosh`, `bash`, `zsh`, `pwsh` |
 | `env` | map | no | Additional environment variables for this step |
 | `output_format` | string | no | Output parsing: `auto` (default), `json`, `yaml`, `text` |
 | `outputs` | map | no | Named output extraction using Go templates on `result` |
@@ -116,6 +116,63 @@ steps:
     do: |
       docker push app:{{ vars.version }}
       echo "Pushed image with digest {{ steps.build.digest }}"
+```
+
+### Shell Types
+
+The default shell is POSIX `sh` (`/bin/sh`), which works on Alpine, distroless containers, and all Linux/macOS systems. Override at the step level using `args.type`:
+
+| Type | Engine | Best For |
+|------|--------|----------|
+| `shell` (default) | `/bin/sh` | Maximum portability |
+| `gosh` | Go-native (mvdan/sh) | Windows, single-binary deployments |
+| `bash` | `/bin/bash` | Bash-specific features (arrays, `[[ ]]`) |
+| `zsh` | `/bin/zsh` | macOS default shell features |
+| `pwsh` | PowerShell | PowerShell scripting |
+
+```yaml
+steps:
+  - name: posix-portable
+    func: shell
+    do: echo "Runs in /bin/sh (default)"
+
+  - name: go-native
+    func: shell
+    args:
+      type: "gosh"
+      cmd: echo "Runs in Go-native shell — works on Windows"
+
+  - name: needs-bash
+    func: shell
+    args:
+      type: "bash"
+      cmd: |
+        declare -A map
+        map[key]="value"
+        echo "${map[key]}"
+```
+
+Shell type can also be configured globally or at workflow level. See [Shell Execution](/spec/shell-execution) for full configuration details.
+
+### Cross-Platform with gosh
+
+`gosh` is OrchStep's built-in Go shell interpreter. It requires no external shell binary, making it ideal for Windows and minimal containers:
+
+```yaml
+name: cross-platform
+config:
+  func:
+    shell:
+      type: "gosh"
+
+tasks:
+  build:
+    steps:
+      - name: compile
+        func: shell
+        do: |
+          echo "Works on Windows, Linux, and macOS"
+          echo "No bash required"
 ```
 
 ### Timeout and Error Handling

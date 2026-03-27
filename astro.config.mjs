@@ -29,6 +29,7 @@ export default defineConfig({
 						{ label: 'Error Handling', slug: 'spec/error-handling' },
 						{ label: 'Templates', slug: 'spec/templates' },
 						{ label: 'Parallel Execution', slug: 'spec/parallel' },
+						{ label: 'Shell Execution', slug: 'spec/shell-execution' },
 					],
 				},
 				{
