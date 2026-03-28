@@ -42,6 +42,7 @@ export default defineConfig({
 						{ label: 'transform', slug: 'functions/transform' },
 						{ label: 'render', slug: 'functions/render' },
 						{ label: 'wait', slug: 'functions/wait' },
+						{ label: 'prompt', slug: 'functions/prompt' },
 					],
 				},
 				{
@@ -79,6 +80,7 @@ export default defineConfig({
 						{ label: 'Modules', slug: 'examples/13-modules' },
 						{ label: 'Real-World Patterns', slug: 'examples/14-real-world-patterns' },
 						{ label: 'Parallel Execution', slug: 'examples/15-parallel-execution' },
+						{ label: 'User Prompts', slug: 'examples/16-user-prompts' },
 					],
 				},
 				{

@@ -1,0 +1,141 @@
+---
+title: User Prompts Examples
+description: Interactive user input in OrchStep workflows
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## Interactive Deployment
+
+A deployment workflow that prompts for environment, version, features, and confirmation. Runs non-interactively in CI with defaults — confirm defaults to false, so the deploy step is safely skipped.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Interactive Deployment with User Prompts
+# Demonstrates all 5 prompt types in a realistic deployment workflow.
+#
+# Key concepts:
+#   - text: free-form input (version number)
+#   - select: choose from options (environment)
+#   - confirm: yes/no before destructive action
+#   - password: masked sensitive input
+#   - multiselect: multiple feature flags
+#
+# Interactive:
+#   orchstep run deploy
+#
+# Non-interactive (CI/CD):
+#   ORCHSTEP_NON_INTERACTIVE=true orchstep run deploy
+#
+# With overrides:
+#   orchstep run deploy --var environment=prod --var version=2.0.0
+
+name: interactive-deploy
+desc: "Deployment workflow with user confirmation"
+
+defaults:
+  app_name: "myapp"
+
+tasks:
+  deploy:
+    desc: "Interactive deployment with prompts"
+    steps:
+      - name: environment
+        desc: "Choose target environment"
+        func: prompt
+        args:
+          message: "Target environment"
+          type: select
+          options: [dev, staging, production]
+          default: dev
+
+      - name: version
+        desc: "Enter version to deploy"
+        func: prompt
+        args:
+          message: "Version to deploy"
+          type: text
+          default: "1.0.0"
+
+      - name: features
+        desc: "Select features to enable"
+        func: prompt
+        args:
+          message: "Enable features"
+          type: multiselect
+          options: [logging, monitoring, caching, cdn]
+          default: [logging, monitoring]
+
+      - name: confirm
+        desc: "Confirm deployment"
+        func: prompt
+        args:
+          message: "Deploy {{ defaults.app_name }} v{{ steps.version.value }} to {{ steps.environment.value }}?"
+          type: confirm
+          default: false
+
+      - name: execute
+        if: '{{ eq steps.confirm.value "true" }}'
+        func: shell
+        do: |
+          echo "Deploying {{ defaults.app_name }} v{{ steps.version.value }}"
+          echo "Environment: {{ steps.environment.value }}"
+          echo "Features: {{ steps.features.value }}"
+          echo "DEPLOY_STATUS=success"
+        outputs:
+          status: '{{ result.output | regexFind "DEPLOY_STATUS=(.+)" }}'
+    ```
+  </TabItem>
+  <TabItem label="Output">
+    ```
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ 🚀 WORKFLOW: interactive-deploy
+│ 📋 Deployment workflow with user confirmation
+╰─────────────────────────────────────────────────────────────────────────────────╯
+
+┌─ 🎯 TASK: deploy
+│  💡 Interactive deployment with prompts
+│
+├─ ⚡ STEP: environment
+│  📝 Choose target environment
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: version
+│  📝 Enter version to deploy
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: features
+│  📝 Select features to enable
+│  ✅ STEP COMPLETED
+│
+├─ ⚡ STEP: confirm
+│  📝 Confirm deployment
+│  ✅ STEP COMPLETED
+│
+└─ ⚡ STEP: execute
+   ✅ STEP COMPLETED
+└─ ✅ TASK 'deploy' COMPLETED
+
+╭─────────────────────────────────────────────────────────────────────────────────╮
+│ ✅ WORKFLOW COMPLETED SUCCESSFULLY                                              │
+╰─────────────────────────────────────────────────────────────────────────────────╯
+    ```
+  </TabItem>
+  <TabItem label="Test">
+    ```yaml
+type: workflow
+tests:
+  - name: test_prompt_deploy_non_interactive
+    desc: "Non-interactive mode skips prompts, confirm defaults to false so deploy is safely skipped"
+    task: deploy
+    env:
+      ORCHSTEP_NON_INTERACTIVE: "true"
+    expect:
+      success: true
+    ```
+  </TabItem>
+</Tabs>
