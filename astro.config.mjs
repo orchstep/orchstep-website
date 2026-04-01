@@ -81,12 +81,20 @@ export default defineConfig({
 						{ label: 'Real-World Patterns', slug: 'examples/14-real-world-patterns' },
 						{ label: 'Parallel Execution', slug: 'examples/15-parallel-execution' },
 						{ label: 'User Prompts', slug: 'examples/16-user-prompts' },
+						{ label: 'Task Discovery', slug: 'examples/17-task-discovery' },
+						{ label: 'Nested Patterns', slug: 'examples/18-nested-patterns' },
 					],
 				},
 				{
 					label: 'Demos',
 					items: [
 						{ label: 'Use Cases', slug: 'demos/use-cases' },
+					],
+				},
+				{
+					label: 'Showcases',
+					items: [
+						{ label: 'Enterprise Showcases', slug: 'showcases/overview' },
 					],
 				},
 				{

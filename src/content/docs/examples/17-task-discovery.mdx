@@ -1,0 +1,210 @@
+---
+title: "Task Discovery Examples"
+description: "OrchStep examples for automatic task file discovery and organization"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## Task File Discovery
+
+OrchStep automatically discovers tasks from the `tasks/` directory. Each YAML file becomes a callable task, letting you organize large workflows across multiple files.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Task File Discovery
+# OrchStep automatically discovers tasks from the tasks/ directory.
+# Each YAML file in tasks/ becomes a callable task, letting you
+# organize large workflows across multiple files.
+#
+# In this example, three task files live under tasks/:
+#   tasks/build.yml   -> callable as "build"
+#   tasks/test.yml    -> callable as "test"
+#   tasks/deploy.yml  -> callable as "deploy"
+#
+# Try: orchstep run
+# Try: orchstep list   (shows discovered tasks)
+
+name: task-file-discovery
+desc: "Auto-discover and run tasks from the tasks/ directory"
+
+tasks:
+  main:
+    desc: "Run the full build, test, deploy pipeline"
+    steps:
+      - name: build_app
+        desc: "Run the discovered build task"
+        task: build
+
+      - name: test_app
+        desc: "Run the discovered test task"
+        task: test
+
+      - name: deploy_app
+        desc: "Run the discovered deploy task"
+        task: deploy
+
+      - name: summary
+        func: shell
+        do: echo "Pipeline complete -- all stages passed"
+    ```
+  </TabItem>
+</Tabs>
+
+[View on GitHub ->](https://github.com/orchstep/orchstep/tree/main/examples/17-task-discovery)
+
+---
+
+## Task Naming Conventions
+
+Task file names map directly to task names. Subdirectories use hyphens to join folder and file names.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Task Naming Conventions
+# Task file names map directly to task names.
+# Flat files:     tasks/build.yml       -> task "build"
+# Subdirectories: tasks/deploy/staging.yml -> task "deploy-staging"
+#
+# The directory structure uses hyphens to join folder and file names.
+# This lets you organize related tasks into folders while keeping
+# a flat, readable task namespace.
+#
+# Try: orchstep run
+# Try: orchstep list
+
+name: task-naming-conventions
+desc: "Demonstrate how file paths map to task names"
+
+tasks:
+  main:
+    desc: "Show naming rules in action"
+    steps:
+      # Flat file: tasks/build.yml -> "build"
+      - name: run_flat_task
+        desc: "Call a top-level task file"
+        func: shell
+        do: echo "Task 'build' comes from tasks/build.yml"
+
+      # Subdirectory: tasks/deploy/staging.yml -> "deploy-staging"
+      - name: run_nested_task
+        desc: "Call a task nested in a subdirectory"
+        func: shell
+        do: echo "Task 'deploy-staging' comes from tasks/deploy/staging.yml"
+
+      # Subdirectory: tasks/deploy/production.yml -> "deploy-production"
+      - name: run_another_nested
+        desc: "Another nested task"
+        func: shell
+        do: echo "Task 'deploy-production' comes from tasks/deploy/production.yml"
+
+      - name: naming_summary
+        func: shell
+        do: |
+          echo "=== Naming Rules ==="
+          echo "tasks/FILE.yml          -> FILE"
+          echo "tasks/DIR/FILE.yml      -> DIR-FILE"
+          echo "tasks/DIR/SUB/FILE.yml  -> DIR-SUB-FILE"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## Task Precedence
+
+When a task is defined both inline and in the `tasks/` directory, the inline definition takes precedence.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Task Precedence
+# When a task is defined both inline and in the tasks/ directory,
+# the inline definition takes precedence over the discovered file.
+#
+# This is useful for overriding a shared task with workflow-specific
+# behavior without removing the original file.
+#
+# In this example, tasks/build.yml exists on disk, but the inline
+# "build" task below wins.
+#
+# Try: orchstep run
+
+name: task-precedence
+desc: "Inline tasks override discovered tasks with the same name"
+
+tasks:
+  main:
+    desc: "Demonstrate inline-over-discovered precedence"
+    steps:
+      - name: run_build
+        desc: "This calls the inline build, not tasks/build.yml"
+        task: build
+
+      - name: confirm
+        func: shell
+        do: echo "The inline definition was used"
+
+  # This inline definition wins over tasks/build.yml
+  build:
+    desc: "Inline build -- overrides the discovered task file"
+    steps:
+      - name: custom_build
+        func: shell
+        do: echo "Running INLINE build (not the discovered tasks/build.yml)"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## Exclusion Patterns
+
+Files prefixed with an underscore (`_`) are excluded from task discovery, letting you keep helpers and drafts in the `tasks/` directory without exposing them.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Excluding Task Files
+# Files prefixed with an underscore (_) are excluded from task discovery.
+# This convention lets you keep helper files, templates, or work-in-progress
+# tasks in the tasks/ directory without exposing them as callable tasks.
+#
+# For example:
+#   tasks/build.yml      -> discovered as task "build"
+#   tasks/_helpers.yml   -> ignored (underscore prefix)
+#   tasks/_draft.yml     -> ignored (underscore prefix)
+#
+# Try: orchstep run
+# Try: orchstep list   (underscore-prefixed files will not appear)
+
+name: exclusion-patterns
+desc: "Show how underscore-prefixed files are excluded from discovery"
+
+tasks:
+  main:
+    desc: "List which tasks are discoverable"
+    steps:
+      - name: explain
+        func: shell
+        do: |
+          echo "=== Task Discovery Exclusion ==="
+          echo ""
+          echo "Discovered (no prefix):"
+          echo "  tasks/build.yml    -> task 'build'"
+          echo "  tasks/test.yml     -> task 'test'"
+          echo "  tasks/deploy.yml   -> task 'deploy'"
+          echo ""
+          echo "Excluded (underscore prefix):"
+          echo "  tasks/_helpers.yml -> not discovered"
+          echo "  tasks/_draft.yml   -> not discovered"
+
+      - name: run_discovered
+        desc: "Only discovered tasks can be called"
+        task: build
+    ```
+  </TabItem>
+</Tabs>

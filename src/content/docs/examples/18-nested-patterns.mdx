@@ -1,0 +1,220 @@
+---
+title: "Nested Patterns Examples"
+description: "OrchStep examples for combining control flow structures"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+---
+
+## Nested Conditionals
+
+Use if/else inside another if/else block for multi-dimensional decisions. OrchStep limits nesting to 2 levels to keep workflows readable.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Nested Conditionals
+# Use if/else inside another if/else block for multi-dimensional decisions.
+# Here we check environment first, then feature flag status.
+#
+# Outer condition: is this production or development?
+# Inner condition: is the feature flag enabled?
+#
+# Note: OrchStep limits nesting to 2 levels to keep workflows readable.
+# For deeper branching, consider switch/case or separate tasks.
+#
+# Try: orchstep run
+# Try: orchstep run --var environment=production --var feature_flag=enabled
+# Try: orchstep run --var environment=development --var feature_flag=disabled
+
+name: nested-conditionals
+desc: "Multi-level conditional decisions for deployment gating"
+
+defaults:
+  environment: "production"
+  feature_flag: "enabled"
+
+tasks:
+  main:
+    desc: "Gate deployment based on environment and feature flag"
+    steps:
+      - name: check_environment
+        if: '{{ eq vars.environment "production" }}'
+        then:
+          - name: check_feature_prod
+            if: '{{ eq vars.feature_flag "enabled" }}'
+            then:
+              - name: deploy_with_feature
+                func: shell
+                do: echo "PRODUCTION -- deploying with new feature enabled"
+            else:
+              - name: deploy_without_feature
+                func: shell
+                do: echo "PRODUCTION -- deploying without new feature (flag disabled)"
+        else:
+          - name: check_feature_dev
+            if: '{{ eq vars.feature_flag "enabled" }}'
+            then:
+              - name: dev_with_feature
+                func: shell
+                do: echo "DEVELOPMENT -- testing new feature locally"
+            else:
+              - name: dev_without_feature
+                func: shell
+                do: echo "DEVELOPMENT -- running baseline (no feature flag)"
+
+      - name: summary
+        func: shell
+        do: |
+          echo "=== Deployment Gate ==="
+          echo "Environment:  {{ vars.environment }}"
+          echo "Feature Flag: {{ vars.feature_flag }}"
+    ```
+  </TabItem>
+</Tabs>
+
+[View on GitHub ->](https://github.com/orchstep/orchstep/tree/main/examples/18-nested-patterns)
+
+---
+
+## Switch Inside Loop
+
+Process a list of items where each item needs different handling based on its type. Combines loop iteration with switch/case routing.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Switch Inside Loop
+# Process a list of items where each item needs different handling
+# based on its type. Combines loop iteration with switch/case routing.
+#
+# Scenario: an event processing pipeline receives mixed event types.
+# Each event is routed to the appropriate handler.
+#
+# Try: orchstep run
+
+name: switch-in-loop
+desc: "Route mixed event types using switch/case inside a loop"
+
+defaults:
+  events: ["deploy", "alert", "metric", "log"]
+
+tasks:
+  main:
+    desc: "Process a stream of mixed events"
+    steps:
+      - name: process_events
+        loop: '{{ vars.events }}'
+        then:
+          - name: route_event
+            switch:
+              value: '{{ loop.item }}'
+              cases:
+                - when: deploy
+                  then:
+                    - name: handle_deploy
+                      func: shell
+                      do: echo "Deploy event -- triggering release pipeline"
+
+                - when: alert
+                  then:
+                    - name: handle_alert
+                      func: shell
+                      do: echo "Alert event -- notifying on-call team"
+
+                - when: metric
+                  then:
+                    - name: handle_metric
+                      func: shell
+                      do: echo "Metric event -- forwarding to monitoring dashboard"
+
+              default:
+                - name: handle_other
+                  func: shell
+                  do: echo "Unknown event type '{{ loop.item }}' -- logging for review"
+
+      - name: done
+        func: shell
+        do: echo "Processed {{ vars.events | len }} events"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## Deep elif Chains
+
+Use elif chains for multi-branch routing without deep nesting. Better than nested if/else when checking one variable against many values.
+
+<Tabs>
+  <TabItem label="Code">
+    ```yaml
+# Example: Deep elif Chains
+# Use elif chains for multi-branch routing without deep nesting.
+# Better than nested if/else when checking one variable against many values.
+#
+# Scenario: route incident alerts based on severity level.
+# Each severity maps to a different response action.
+#
+# Try: orchstep run
+# Try: orchstep run --var severity=critical
+# Try: orchstep run --var severity=high
+# Try: orchstep run --var severity=low
+
+name: deep-elif-chains
+desc: "Multi-branch routing with elif for incident severity"
+
+defaults:
+  severity: "medium"
+
+tasks:
+  main:
+    desc: "Route an incident based on its severity"
+    steps:
+      - name: route_severity
+        if: '{{ eq vars.severity "critical" }}'
+        task: page_oncall
+        elif:
+          - if: '{{ eq vars.severity "high" }}'
+            task: create_ticket
+          - if: '{{ eq vars.severity "medium" }}'
+            task: log_warning
+        else: ignore_noise
+
+      - name: done
+        func: shell
+        do: |
+          echo "=== Incident Routed ==="
+          echo "Severity: {{ vars.severity }}"
+
+  page_oncall:
+    desc: "Critical -- wake up the on-call engineer"
+    steps:
+      - name: page
+        func: shell
+        do: echo "CRITICAL -- paging on-call engineer via PagerDuty"
+
+  create_ticket:
+    desc: "High -- create a tracking ticket"
+    steps:
+      - name: ticket
+        func: shell
+        do: echo "HIGH -- creating Jira ticket for investigation"
+
+  log_warning:
+    desc: "Medium -- log a warning for review"
+    steps:
+      - name: warn
+        func: shell
+        do: echo "MEDIUM -- logging warning to monitoring system"
+
+  ignore_noise:
+    desc: "Low -- no action needed"
+    steps:
+      - name: skip
+        func: shell
+        do: echo "LOW -- ignoring noise, no action required"
+    ```
+  </TabItem>
+</Tabs>
