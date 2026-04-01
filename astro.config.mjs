@@ -30,6 +30,7 @@ export default defineConfig({
 						{ label: 'Templates', slug: 'spec/templates' },
 						{ label: 'Parallel Execution', slug: 'spec/parallel' },
 						{ label: 'Shell Execution', slug: 'spec/shell-execution' },
+						{ label: 'Stdin & Pipes', slug: 'spec/stdin-pipe' },
 					],
 				},
 				{
