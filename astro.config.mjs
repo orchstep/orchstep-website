@@ -109,10 +109,6 @@ export default defineConfig({
                     { label: 'Overview', slug: 'pro/overview' },
                 ],
             },
-            {
-                label: 'Pricing',
-                link: '/pricing',
-            },
         ],
         customCss: ['./src/styles/custom.css'],
 		}), react()],

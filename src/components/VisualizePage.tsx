@@ -1,4 +1,72 @@
 import React, { useState, useCallback } from 'react'
+
+function highlightValue(value: string, colors: Record<string, string>): React.ReactNode {
+  if (!value) return null
+  const trimmed = value.trim()
+
+  // Quoted strings
+  if ((trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+      (trimmed.startsWith('"') && trimmed.endsWith('"'))) {
+    return <span style={{ color: colors.string }}>{value}</span>
+  }
+  // Numbers
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    return <span style={{ color: colors.number }}>{value}</span>
+  }
+  // Booleans and null
+  if (['true', 'false', 'null', 'yes', 'no'].includes(trimmed.toLowerCase())) {
+    return <span style={{ color: colors.bool }}>{value}</span>
+  }
+  // Inline comment
+  if (value.includes(' #')) {
+    const idx = value.indexOf(' #')
+    return <>{highlightValue(value.slice(0, idx), colors)}<span style={{ color: colors.comment }}>{value.slice(idx)}</span></>
+  }
+  return <span style={{ color: colors.text }}>{value}</span>
+}
+
+function highlightYaml(code: string, theme: 'light' | 'dark'): React.ReactNode[] {
+  const colors = theme === 'dark' ? {
+    key: '#c678dd', string: '#98c379', comment: '#5c6370',
+    number: '#d19a66', bool: '#56b6c2', dash: '#e06c75', text: '#abb2bf',
+  } : {
+    key: '#7c3aed', string: '#16a34a', comment: '#6b7280',
+    number: '#b45309', bool: '#0891b2', dash: '#dc2626', text: '#1e1e1e',
+  }
+
+  return code.split('\n').map((line, i) => {
+    let highlighted: React.ReactNode
+
+    if (line.trimStart().startsWith('#')) {
+      highlighted = <span style={{ color: colors.comment }}>{line}</span>
+    } else {
+      const keyMatch = line.match(/^(\s*)(- )?([a-zA-Z_][a-zA-Z0-9_]*)(:\s*)(.*)$/)
+      if (keyMatch) {
+        const [, indent, dash, key, colon, value] = keyMatch
+        const valuePart = highlightValue(value, colors)
+        highlighted = <>
+          {indent}
+          {dash && <span style={{ color: colors.dash }}>{dash}</span>}
+          <span style={{ color: colors.key, fontWeight: 600 }}>{key}</span>
+          <span>{colon}</span>
+          {valuePart}
+        </>
+      } else if (line.trimStart().startsWith('- ')) {
+        const indent = line.match(/^(\s*)/)?.[1] || ''
+        const rest = line.slice(indent.length + 2)
+        highlighted = <>
+          {indent}
+          <span style={{ color: colors.dash }}>- </span>
+          {highlightValue(rest, colors)}
+        </>
+      } else {
+        highlighted = <span style={{ color: colors.text }}>{line}</span>
+      }
+    }
+
+    return <React.Fragment key={i}>{highlighted}{'\n'}</React.Fragment>
+  })
+}
 import { WorkflowViewer } from './workflow-viewer'
 import type { Theme } from './workflow-viewer/types'
 
@@ -225,24 +293,38 @@ export default function VisualizePage() {
               Hide
             </button>
           </div>
-          <textarea
-            value={yaml}
-            onChange={e => setYaml(e.target.value)}
-            spellCheck={false}
-            style={{
-              flex: 1,
-              padding: 16,
-              fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-              fontSize: 13,
-              lineHeight: 1.6,
-              border: 'none',
-              outline: 'none',
-              resize: 'none',
-              background: ed.bg,
-              color: ed.text,
+          <div style={{ flex: 1, position: 'relative', overflow: 'auto' }}>
+            {/* Highlighted overlay */}
+            <pre style={{
+              position: 'absolute', top: 0, left: 0, right: 0,
+              padding: 16, margin: 0,
+              fontFamily: "'SF Mono', 'Fira Code', monospace",
+              fontSize: 13, lineHeight: 1.6,
+              color: ed.text, pointerEvents: 'none',
+              whiteSpace: 'pre-wrap', wordWrap: 'break-word',
               tabSize: 2,
-            }}
-          />
+            }}>
+              {highlightYaml(yaml, theme)}
+            </pre>
+            {/* Invisible textarea for editing */}
+            <textarea
+              value={yaml}
+              onChange={e => setYaml(e.target.value)}
+              spellCheck={false}
+              style={{
+                position: 'relative',
+                width: '100%', minHeight: '100%',
+                padding: 16,
+                fontFamily: "'SF Mono', 'Fira Code', monospace",
+                fontSize: 13, lineHeight: 1.6,
+                border: 'none', outline: 'none', resize: 'none',
+                background: 'transparent',
+                color: 'transparent',
+                caretColor: ed.text,
+                tabSize: 2,
+              }}
+            />
+          </div>
         </div>
       )}
 
