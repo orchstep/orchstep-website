@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react'
-import '../styles/reactflow.css'
 import { WorkflowViewer } from './workflow-viewer'
 
 const EXAMPLES: Record<string, string> = {
