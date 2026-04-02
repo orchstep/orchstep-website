@@ -1,5 +1,5 @@
 ---
-// Custom page — bypasses Starlight's docs template for full-width layout
+// Custom page — full-viewport workflow visualizer
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -16,46 +16,42 @@
       align-items: center;
       gap: 16px;
       padding: 0 20px;
-      height: 48px;
+      height: 44px;
       background: #111;
       color: white;
       border-bottom: 1px solid #333;
     }
-    .topbar a {
+    .topbar a.brand {
       color: #e94560;
       text-decoration: none;
       font-weight: 700;
       font-size: 16px;
     }
-    .topbar span {
+    .topbar .title {
       color: #888;
       font-size: 14px;
     }
     .topbar .spacer { flex: 1; }
-    .topbar .back-link {
+    .topbar .nav-link {
       color: #aaa;
       font-size: 13px;
       text-decoration: none;
     }
-    .topbar .back-link:hover { color: white; }
+    .topbar .nav-link:hover { color: white; }
 
     #visualizer-root {
       width: 100%;
-      height: calc(100vh - 48px);
+      height: calc(100vh - 44px);
     }
-
-    /* React Flow styles — inline fallback */
-    .react-flow__node { cursor: pointer; }
-    .react-flow__edge-path { cursor: pointer; }
   </style>
 </head>
 <body>
   <div class="topbar">
-    <a href="/">OrchStep</a>
-    <span>Workflow Visualizer</span>
+    <a class="brand" href="/">OrchStep</a>
+    <span class="title">Workflow Visualizer</span>
     <div class="spacer"></div>
-    <a class="back-link" href="/getting-started/introduction">Docs</a>
-    <a class="back-link" href="https://github.com/orchstep/orchstep" target="_blank">GitHub</a>
+    <a class="nav-link" href="/getting-started/introduction">Docs</a>
+    <a class="nav-link" href="https://github.com/orchstep/orchstep" target="_blank">GitHub</a>
   </div>
   <div id="visualizer-root"></div>
 
@@ -63,8 +59,6 @@
     import { createElement } from 'react';
     import { createRoot } from 'react-dom/client';
     import VisualizePage from '../components/VisualizePage';
-
-    // Import React Flow CSS
     import '@xyflow/react/dist/style.css';
 
     const root = createRoot(document.getElementById('visualizer-root'));

@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react'
 import { WorkflowViewer } from './workflow-viewer'
+import type { Theme } from './workflow-viewer/types'
 
 const EXAMPLES: Record<string, string> = {
   'CI/CD Pipeline': `name: ci-cd-pipeline
@@ -117,10 +118,37 @@ tasks:
 `,
 }
 
+const lightEditor = {
+  bg: '#f8f8f8',
+  text: '#1e1e1e',
+  headerBg: '#eee',
+  headerText: '#333',
+  border: '#ddd',
+  selectBg: 'white',
+  selectText: '#333',
+  selectBorder: '#ccc',
+  btnBg: '#e0e0e0',
+  btnText: '#333',
+}
+
+const darkEditor = {
+  bg: '#1e1e2e',
+  text: '#e0e0e0',
+  headerBg: '#2a2a3e',
+  headerText: '#ccc',
+  border: '#444',
+  selectBg: '#333',
+  selectText: '#eee',
+  selectBorder: '#555',
+  btnBg: '#444',
+  btnText: '#ccc',
+}
+
 export default function VisualizePage() {
   const [yaml, setYaml] = useState(Object.values(EXAMPLES)[0])
   const [editorOpen, setEditorOpen] = useState(false)
   const [selectedExample, setSelectedExample] = useState(Object.keys(EXAMPLES)[0])
+  const [theme, setTheme] = useState<Theme>('light')
 
   const handleExampleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const name = e.target.value
@@ -128,31 +156,42 @@ export default function VisualizePage() {
     setYaml(EXAMPLES[name])
   }, [])
 
+  // Listen for theme changes from the WorkflowViewer
+  const handleThemeChange = useCallback(() => {
+    // Check the data-theme attribute on the viewer container
+    setTimeout(() => {
+      const viewerEl = document.querySelector('[data-theme]')
+      if (viewerEl) {
+        const t = viewerEl.getAttribute('data-theme') as Theme
+        if (t) setTheme(t)
+      }
+    }, 50)
+  }, [])
+
+  const ed = theme === 'dark' ? darkEditor : lightEditor
+
   return (
-    <div style={{
-      display: 'flex',
-      width: '100%',
-      height: 'calc(100vh - 80px)',
-      minHeight: 600,
-      position: 'relative',
-    }}>
+    <div
+      style={{ display: 'flex', width: '100%', height: '100%' }}
+      onClick={handleThemeChange}
+    >
       {/* Editor panel */}
       {editorOpen && (
         <div style={{
           width: 380,
           flexShrink: 0,
-          borderRight: '1px solid #e0e0e0',
+          borderRight: `1px solid ${ed.border}`,
           display: 'flex',
           flexDirection: 'column',
-          background: '#1e1e2e',
+          background: ed.bg,
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
             padding: '8px 12px',
-            background: '#2a2a3e',
-            borderBottom: '1px solid #444',
+            background: ed.headerBg,
+            borderBottom: `1px solid ${ed.border}`,
           }}>
             <select
               value={selectedExample}
@@ -161,9 +200,9 @@ export default function VisualizePage() {
                 flex: 1,
                 padding: '6px 8px',
                 borderRadius: 4,
-                border: '1px solid #555',
-                background: '#333',
-                color: '#eee',
+                border: `1px solid ${ed.selectBorder}`,
+                background: ed.selectBg,
+                color: ed.selectText,
                 fontSize: 13,
               }}
             >
@@ -174,13 +213,13 @@ export default function VisualizePage() {
             <button
               onClick={() => setEditorOpen(false)}
               style={{
-                background: '#444',
+                background: ed.btnBg,
                 border: 'none',
                 borderRadius: 4,
                 padding: '6px 12px',
                 cursor: 'pointer',
                 fontSize: 12,
-                color: '#ccc',
+                color: ed.btnText,
               }}
             >
               Hide
@@ -199,47 +238,60 @@ export default function VisualizePage() {
               border: 'none',
               outline: 'none',
               resize: 'none',
-              background: '#1e1e2e',
-              color: '#e0e0e0',
+              background: ed.bg,
+              color: ed.text,
               tabSize: 2,
             }}
           />
         </div>
       )}
 
-      {/* Edit YAML button (when editor is closed) */}
+      {/* Editor toggle tab (when closed) */}
       {!editorOpen && (
-        <div style={{ position: 'absolute', left: 12, top: 12, zIndex: 5, display: 'flex', gap: 8 }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          padding: '8px 6px',
+          background: ed.headerBg,
+          borderRight: `1px solid ${ed.border}`,
+        }}>
           <button
             onClick={() => setEditorOpen(true)}
+            title="Open YAML Editor"
             style={{
-              background: 'white',
-              border: '1px solid #ddd',
-              borderRadius: 6,
-              padding: '8px 16px',
+              background: ed.btnBg,
+              border: 'none',
+              borderRadius: 4,
+              padding: '8px 6px',
               cursor: 'pointer',
-              fontSize: 13,
-              fontWeight: 500,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+              fontSize: 11,
+              color: ed.btnText,
+              writingMode: 'vertical-rl',
+              textOrientation: 'mixed',
+              letterSpacing: 1,
+              fontWeight: 600,
             }}
           >
-            Edit YAML
+            YAML
           </button>
           <select
             value={selectedExample}
             onChange={handleExampleChange}
+            title="Select example"
             style={{
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: '1px solid #ddd',
-              background: 'white',
-              fontSize: 13,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+              padding: '4px 2px',
+              borderRadius: 4,
+              border: `1px solid ${ed.selectBorder}`,
+              background: ed.selectBg,
+              color: ed.selectText,
+              fontSize: 10,
+              width: 32,
               cursor: 'pointer',
             }}
           >
-            {Object.keys(EXAMPLES).map(name => (
-              <option key={name} value={name}>{name}</option>
+            {Object.keys(EXAMPLES).map((name, i) => (
+              <option key={name} value={name}>{i + 1}</option>
             ))}
           </select>
         </div>
