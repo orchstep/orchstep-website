@@ -123,17 +123,17 @@ export function TaskGroupNode({ id, data }: { id: string; data: TaskGroupData })
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #111)', flex: 1 }}>
           {data.label}
         </span>
+        {collapsed && (
+          <span style={{ fontSize: 10, color: 'var(--text-secondary, #888)' }}>
+            {stepCount} steps
+          </span>
+        )}
         {onToggleCollapse && (
           <span style={{ fontSize: 12, color: '#999' }}>
             {collapsed ? '\u25b8' : '\u25be'}
           </span>
         )}
       </div>
-      {collapsed && (
-        <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-secondary, #888)' }}>
-          {stepCount} steps (collapsed)
-        </div>
-      )}
       <div
         className="nodrag"
         onMouseDown={onResizeStart}
