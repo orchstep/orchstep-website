@@ -2,8 +2,13 @@
 title: Workflow Visualizer
 description: Visualize OrchStep workflow YAML as interactive diagrams
 template: splash
+hero:
+  title: ""
+  tagline: ""
 ---
 
 import VisualizePage from '../../components/VisualizePage'
 
-<VisualizePage client:only="react" />
+<div class="visualizer-fullwidth">
+  <VisualizePage client:only="react" />
+</div>

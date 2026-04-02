@@ -5,3 +5,20 @@
   --sl-color-accent-high: #e94560;
   --sl-font: 'Inter', system-ui, sans-serif;
 }
+
+/* Full-width visualizer page */
+.visualizer-fullwidth {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  padding: 0;
+}
+
+/* Remove splash page hero padding for visualizer */
+[data-page-type="splash"] .hero {
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+
+[data-page-type="splash"] header + div {
+  padding: 0 !important;
+}

@@ -10,7 +10,8 @@ import {
   MarkerType,
 } from '@xyflow/react'
 import type { Node, NodeChange } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+// CSS import moved to VisualizePage to avoid Astro build issues
+// import '@xyflow/react/dist/style.css'
 
 import { StepNode } from './nodes/StepNode'
 import { TaskGroupNode } from './nodes/TaskGroupNode'
